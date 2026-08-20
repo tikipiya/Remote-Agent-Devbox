@@ -74,6 +74,7 @@ services:
     profiles: ["build"]
 
   ide-proxy:
+    image: ${RAD_IDE_PROXY_IMAGE:-remote-agent-devbox-ide-proxy:local}
     build:
       context: .
       dockerfile: images/ide-proxy/Dockerfile

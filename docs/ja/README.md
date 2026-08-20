@@ -13,6 +13,7 @@
 - [マイルストーン 1 — イミュータブルなレビューパイプライン](./architecture/MILESTONE_1.md)
 - [マイルストーン 2 — 承認済み Git 書き込みパイプライン](./architecture/MILESTONE_2.md)
 - [マイルストーン 3 — 運用上のセキュリティ Posture](./architecture/MILESTONE_3.md)
+- [マイルストーン 4 — ワンタイム IDE アクセス](./architecture/MILESTONE_4_IDE_ACCESS.md)
 - [Codex ID 境界](./architecture/CODEX_IDENTITY_BOUNDARY.md)
 
 ## セキュリティゲート

@@ -28,6 +28,8 @@ and includes the Milestone 3 operational security posture pipeline.
   maintenance mode, monotonic epochs, state invalidation, and append-only audit.
 - A secret-free transactional outbox durably delivers Workspace state intent
   to the idempotent reconciler.
+- One-time, epoch-bound IDE codes are exchanged for short-lived sessions at a
+  hardened Proxy; Workspace code-server ports are not published directly.
 
 See [SECURITY.md](./SECURITY.md) for the trust boundary and deployment claims.
 
@@ -62,6 +64,7 @@ disabled unless both Discord environment variables are supplied.
 - [Milestone 1 immutable review pipeline](./docs/architecture/MILESTONE_1.md)
 - [Milestone 2 approved Git write pipeline](./docs/architecture/MILESTONE_2.md)
 - [Milestone 3 operational security posture](./docs/architecture/MILESTONE_3.md)
+- [Milestone 4 one-time IDE access](./docs/architecture/MILESTONE_4_IDE_ACCESS.md)
 - [Deployment tiers](./docs/DEPLOYMENT_TIERS.md)
 - [Codex identity boundary](./docs/architecture/CODEX_IDENTITY_BOUNDARY.md)
 - [Security Gate A](./docs/security/SECURITY_GATE_A.md)

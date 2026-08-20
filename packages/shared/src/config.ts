@@ -43,6 +43,7 @@ export const runtimeConfigSchema = z
     RAD_APPROVAL_TTL_SECONDS: positiveInteger.min(60).max(86_400).default(3_600),
     RAD_IDE_ACCESS_CODE_TTL_SECONDS: positiveInteger.min(10).max(600).default(60),
     RAD_IDE_SESSION_TTL_SECONDS: positiveInteger.min(60).max(14_400).default(3_600),
+    RAD_IDE_PROXY_IMAGE: z.string().min(1).default("remote-agent-devbox-ide-proxy:local"),
     RAD_IDE_PROXY_PUBLIC_URL: z
       .url()
       .refine(isHttpOrigin, "IDE proxy public URL must be an HTTP(S) origin")

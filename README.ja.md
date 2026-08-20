@@ -20,6 +20,7 @@ Remote Agent Devbox は、分離された使い捨ての Workspace で AI Coding
 - 最終再検証、1回限りの Credential Lease、リモート compare-and-swap によって、書き込み先を Workspace 専用の Agent Branch に制限します。
 - 暗黙のセキュリティ Posture 変更はブロックされます。明示的なマイグレーションでは、メンテナンスモード、単調増加する Epoch、状態の無効化、追記専用の監査を使用します。
 - シークレットを含まない Transactional Outbox が、Workspace の状態変更の意図を冪等な Reconciler へ永続的に配信します。
+- Epoch に結び付いたワンタイム IDE コードは、ハードニングされた Proxy で短命な Session に交換されます。Workspace の code-server Port は直接公開されません。
 
 信頼境界とデプロイに関する主張については、[セキュリティポリシー](./SECURITY.ja.md)を参照してください。
 
@@ -50,6 +51,7 @@ HTTP Service はデフォルトで `127.0.0.1:3000` を Listen します。Disco
 - [マイルストーン 1 — イミュータブルなレビューパイプライン](./docs/ja/architecture/MILESTONE_1.md)
 - [マイルストーン 2 — 承認済み Git 書き込みパイプライン](./docs/ja/architecture/MILESTONE_2.md)
 - [マイルストーン 3 — 運用上のセキュリティ Posture](./docs/ja/architecture/MILESTONE_3.md)
+- [マイルストーン 4 — ワンタイム IDE アクセス](./docs/ja/architecture/MILESTONE_4_IDE_ACCESS.md)
 - [デプロイ Tier](./docs/ja/DEPLOYMENT_TIERS.md)
 - [Codex ID 境界](./docs/ja/architecture/CODEX_IDENTITY_BOUNDARY.md)
 - [Security Gate A](./docs/ja/security/SECURITY_GATE_A.md)

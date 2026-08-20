@@ -30,10 +30,11 @@ re-runs the validator, Codex identity, and Git CAS boundaries.
 
 ## Deployment gate
 
-Back up PostgreSQL, apply migrations 007 through 009, and rehearse an epoch-only
+Back up PostgreSQL, apply migrations 007 through 010, and rehearse an epoch-only
 rotation with a disposable deployment before claiming Gate D. Verify that old
 approvals cannot be approved or used afterward, active Workspaces converge to
-`STOPPED`, audit events are present, and the service exits maintenance.
+`STOPPED`, IDE codes/sessions are invalid, audit events are present, and the
+service exits maintenance.
 
 After every database restore, run an epoch-only rotation before resuming. A
 restore that simply starts serving old approvals does not satisfy Gate D.

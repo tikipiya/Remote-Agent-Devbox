@@ -20,6 +20,7 @@ describe("loadRuntimeConfig", () => {
     expect(config.RAD_APPROVAL_TTL_SECONDS).toBe(3_600);
     expect(config.RAD_IDE_ACCESS_CODE_TTL_SECONDS).toBe(60);
     expect(config.RAD_IDE_SESSION_TTL_SECONDS).toBe(3_600);
+    expect(config.RAD_IDE_PROXY_IMAGE).toBe("remote-agent-devbox-ide-proxy:local");
     expect(config.RAD_IDE_PROXY_PUBLIC_URL).toBe("http://127.0.0.1:3001");
   });
 

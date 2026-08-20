@@ -57,6 +57,6 @@ Thread では `approvalPolicy: never`、`sandbox: workspace-write`、単一の�
 
 - クローンできるのは、公開 HTTPS Git リポジトリのみです。
 - エージェントタスクを実行する前に、運用者が専用の `RAD_CODEX_API_KEY` を用意する必要があります。キーは短命な信頼済み Agent Runner にのみ注入され、Workspace にマウントまたは転送されることはありません。[Codex ID 境界](./CODEX_IDENTITY_BOUNDARY.md)を参照してください。
-- IDE は `--auth none` でホストのループバックへマッピングされます。ローカルの Tier 1 デプロイにのみ適しています。ワンタイム IDE URL はマイルストーン 4 のハードニング項目です。
+- IDE アクセスは、マイルストーン 4 のワンタイムアクセス Proxy を介するようになりました。Workspace の code-server Port は直接公開されません。
 - 新規ボリュームでは、PostgreSQL の初期化スクリプトによってデータベースマイグレーションが適用されます。既存インストール向けのアップグレードマイグレーションは実装されていません。
 - Transactional Outbox、承認、Git 書き込みは後続マイルストーンの対象です。成果物レビューは、マイルストーン 1 のイミュータブルなレビューパイプラインで実装されています。
