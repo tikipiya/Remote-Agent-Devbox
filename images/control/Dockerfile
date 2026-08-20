@@ -12,6 +12,9 @@ FROM node:22.15.0-bookworm-slim
 
 ENV NODE_ENV=production
 WORKDIR /opt/rad
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=build --chown=node:node /opt/rad /opt/rad
 RUN mkdir -p /var/lib/rad/artifacts && chown node:node /var/lib/rad/artifacts

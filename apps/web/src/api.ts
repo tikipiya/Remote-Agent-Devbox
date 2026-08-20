@@ -61,6 +61,30 @@ export interface ApprovalRequest {
   decidedAt: string | null;
 }
 
+export interface GitOperation {
+  id: string;
+  approvalId: string;
+  branchName: string;
+  targetCommit: string;
+  expectedRemoteHead: string | null;
+  reviewDigest: string;
+  validatorProfileDigest: string;
+  securityEpoch: number;
+  state:
+    | "PENDING"
+    | "VALIDATING"
+    | "WAITING_CREDENTIAL"
+    | "PUSHING"
+    | "SUCCEEDED"
+    | "FAILED"
+    | "CONFLICT"
+    | "CANCELLED"
+    | "STALE";
+  staleReason: string | null;
+  errorCode: string | null;
+  pullRequestUrl: string | null;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -135,3 +159,6 @@ export const decideApproval = (
     method: "POST",
     body: JSON.stringify({ decision, decidedBy }),
   });
+
+export const startGitOperation = (approvalId: string): Promise<GitOperation> =>
+  request(`/api/approvals/${approvalId}/git-operations`, { method: "POST" });

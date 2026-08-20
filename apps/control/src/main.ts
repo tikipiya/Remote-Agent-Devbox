@@ -1,6 +1,7 @@
 import { loadRuntimeConfig } from "@rad/shared";
 import { PostgresAgentTaskRepository } from "@rad/agents";
 import { PostgresApprovalRepository } from "@rad/approvals";
+import { PostgresGitOperationRepository } from "@rad/git-operations";
 import {
   PostgresGitArtifactRepository,
   PostgresReviewSnapshotRepository,
@@ -23,6 +24,9 @@ import { ArtifactStore } from "./artifacts/artifact-store.js";
 import { DockerValidatorLauncher } from "./validation/docker-validator.js";
 import { ReviewService } from "./validation/review-service.js";
 import { ApprovalService } from "./approvals/approval-service.js";
+import { ExactRevalidator } from "./validation/exact-revalidator.js";
+import { GitOperationService } from "./git/git-operation-service.js";
+import { GitRemoteHeadObserver } from "./git/remote-head-observer.js";
 
 const config = loadRuntimeConfig();
 const { db, pool } = createDatabase(config.RAD_DATABASE_URL);
@@ -71,6 +75,8 @@ const artifactStore = new ArtifactStore(
 await artifactStore.initialize();
 const artifactRepository = new PostgresGitArtifactRepository(db);
 const reviewRepository = new PostgresReviewSnapshotRepository(db);
+const approvalRepository = new PostgresApprovalRepository(db);
+const operationRepository = new PostgresGitOperationRepository(db);
 const artifactService = new ArtifactService(
   artifactRepository,
   repository,
@@ -85,10 +91,22 @@ const reviewService = new ReviewService(
   new DockerValidatorLauncher(config, commandRunner),
 );
 const approvalService = new ApprovalService(
-  new PostgresApprovalRepository(db),
+  approvalRepository,
   reviewRepository,
   repository,
   config.RAD_APPROVAL_TTL_SECONDS,
+);
+const gitOperationService = new GitOperationService(
+  approvalRepository,
+  reviewRepository,
+  artifactRepository,
+  repository,
+  operationRepository,
+  new GitRemoteHeadObserver(commandRunner),
+  new ExactRevalidator(
+    repository,
+    new DockerValidatorLauncher(config, commandRunner),
+  ),
 );
 const server = createControlServer({
   config,
@@ -100,6 +118,7 @@ const server = createControlServer({
   artifactService,
   reviewService,
   approvalService,
+  gitOperationService,
 });
 
 const reconcileTimer = setInterval(() => {

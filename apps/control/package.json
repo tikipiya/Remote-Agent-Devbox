@@ -13,6 +13,7 @@
     "@rad/agents": "0.0.0",
     "@rad/approvals": "0.0.0",
     "@rad/git-artifacts": "0.0.0",
+    "@rad/git-operations": "0.0.0",
     "@rad/shared": "0.0.0",
     "@rad/workspace-state": "0.0.0",
     "@fastify/static": "10.1.3",

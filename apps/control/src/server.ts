@@ -23,6 +23,7 @@ import type { TaskService } from "./tasks/task-service.js";
 import type { ArtifactService } from "./artifacts/artifact-service.js";
 import type { ReviewService } from "./validation/review-service.js";
 import type { ApprovalService } from "./approvals/approval-service.js";
+import type { GitOperationService } from "./git/git-operation-service.js";
 
 export interface ControlServices {
   config: RuntimeConfig;
@@ -34,6 +35,7 @@ export interface ControlServices {
   artifactService: Pick<ArtifactService, "capture" | "get">;
   reviewService: Pick<ReviewService, "validateArtifact" | "get">;
   approvalService: Pick<ApprovalService, "request" | "get" | "approve" | "deny">;
+  gitOperationService: Pick<GitOperationService, "start" | "get">;
 }
 
 const repositoryBodySchema = z.object({
@@ -197,6 +199,21 @@ export function createControlServer(services: ControlServices): FastifyInstance 
     return input.decision === "APPROVE"
       ? services.approvalService.approve(id, input.decidedBy)
       : services.approvalService.deny(id, input.decidedBy);
+  });
+
+  server.post("/api/approvals/:id/git-operations", async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const operation = await services.gitOperationService.start(id);
+    return reply.status(201).send(operation);
+  });
+
+  server.get("/api/git-operations/:id", async (request) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const operation = await services.gitOperationService.get(id);
+    if (!operation) {
+      throw new RadError("GIT_OPERATION_NOT_FOUND", `Git operation ${id} not found`);
+    }
+    return operation;
   });
 
   return server;

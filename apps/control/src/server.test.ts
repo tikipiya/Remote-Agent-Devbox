@@ -50,6 +50,10 @@ function testServices(): ControlServices {
       approve: unavailable,
       deny: unavailable,
     },
+    gitOperationService: {
+      start: unavailable,
+      get: unavailable,
+    },
   };
 }
 
