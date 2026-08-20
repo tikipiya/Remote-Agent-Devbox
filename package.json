@@ -13,12 +13,12 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "tsc -b",
     "check": "npm run typecheck && npm run test",
     "dev": "npm run dev --workspace=@rad/control",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "tsc -b --pretty false"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
@@ -27,4 +27,3 @@
     "vitest": "4.1.11"
   }
 }
-

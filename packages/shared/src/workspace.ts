@@ -30,13 +30,21 @@ export type ObservedWorkspaceState = z.infer<
   typeof observedWorkspaceStateSchema
 >;
 
+export const repositorySchema = z.object({
+  id: z.uuid(),
+  remoteUrl: z.url().refine((url) => url.startsWith("https://"), {
+    message: "remoteUrl must use HTTPS",
+  }),
+  defaultBranch: z.string().min(1).max(255),
+  createdAt: z.date(),
+});
+
+export type Repository = z.infer<typeof repositorySchema>;
+
 export const workspaceSchema = z.object({
   id: z.uuid(),
   ownerUserId: z.uuid(),
   repositoryId: z.uuid(),
-  repositoryUrl: z.url().refine((url) => url.startsWith("https://"), {
-    message: "repositoryUrl must use HTTPS",
-  }),
   desiredState: desiredWorkspaceStateSchema,
   observedState: observedWorkspaceStateSchema,
   stateVersion: z.number().int().nonnegative(),
@@ -52,4 +60,3 @@ export const workspaceSchema = z.object({
 });
 
 export type Workspace = z.infer<typeof workspaceSchema>;
-
