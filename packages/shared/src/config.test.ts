@@ -15,6 +15,14 @@ describe("loadRuntimeConfig", () => {
     expect(config.RAD_WORKSPACE_NETWORK).not.toBe(config.RAD_CONTROL_NETWORK);
     expect(config.RAD_WORKSPACE_PIDS).toBeGreaterThan(0);
     expect(config.RAD_ARTIFACT_MAX_BYTES).toBe(64 * 1024 * 1024);
+    expect(config.RAD_ARTIFACT_VOLUME).toBe("rad-artifacts");
+    expect(config.RAD_VALIDATOR_IMAGE_DIGEST).toBeUndefined();
+  });
+
+  it("rejects non-canonical validator image digests", () => {
+    expect(() =>
+      loadRuntimeConfig({ ...validEnvironment, RAD_VALIDATOR_IMAGE_DIGEST: "latest" })
+    ).toThrow();
   });
 
   it("fails closed when workspace and control networks are shared", () => {

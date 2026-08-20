@@ -25,6 +25,17 @@ export const runtimeConfigSchema = z
     RAD_ARTIFACT_MAX_BYTES: positiveInteger
       .max(1024 * 1024 * 1024)
       .default(64 * 1024 * 1024),
+    RAD_ARTIFACT_VOLUME: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*$/).default("rad-artifacts"),
+    RAD_VALIDATOR_IMAGE: z.string().min(1).default("remote-agent-devbox-validator:local"),
+    RAD_VALIDATOR_IMAGE_DIGEST: z
+      .string()
+      .regex(/^sha256:[0-9a-f]{64}$/)
+      .optional()
+      .or(z.literal("")),
+    RAD_VALIDATOR_MEMORY_MB: positiveInteger.min(128).max(4096).default(512),
+    RAD_VALIDATOR_CPUS: z.coerce.number().positive().max(4).default(1),
+    RAD_VALIDATOR_PIDS: positiveInteger.min(16).max(512).default(64),
+    RAD_VALIDATOR_TIMEOUT_MS: positiveInteger.min(1_000).max(600_000).default(120_000),
     RAD_CODEX_API_KEY: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_TOKEN: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_APPLICATION_ID: z.string().min(1).optional().or(z.literal("")),

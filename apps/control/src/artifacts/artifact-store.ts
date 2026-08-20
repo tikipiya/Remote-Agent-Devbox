@@ -61,7 +61,20 @@ export class ArtifactStore {
 
     const artifactDigest = await digestFile(stagingPath);
     const hexDigest = artifactDigest.slice("sha256:".length);
-    const storageKey = `sha256/${hexDigest}.bundle`;
+    const artifactDirectory = join(this.digestRoot, hexDigest);
+    try {
+      await mkdir(artifactDirectory, { mode: 0o700 });
+    } catch (error) {
+      if (!isAlreadyExists(error)) throw error;
+      const existingDirectory = await lstat(artifactDirectory);
+      if (!existingDirectory.isDirectory() || existingDirectory.isSymbolicLink()) {
+        throw new RadError(
+          "ARTIFACT_STORAGE_CONFLICT",
+          `Artifact namespace sha256/${hexDigest} is not a trusted directory`,
+        );
+      }
+    }
+    const storageKey = `sha256/${hexDigest}/artifact.bundle`;
     const destination = this.resolve(storageKey);
 
     const handle = await open(stagingPath, "r+");
@@ -98,7 +111,7 @@ export class ArtifactStore {
   }
 
   public resolve(storageKey: string): string {
-    if (!/^sha256\/[0-9a-f]{64}\.bundle$/.test(storageKey)) {
+    if (!/^sha256\/[0-9a-f]{64}\/artifact\.bundle$/.test(storageKey)) {
       throw new RadError("INVALID_STORAGE_KEY", "Artifact storage key is invalid");
     }
     const path = resolve(this.root, storageKey);

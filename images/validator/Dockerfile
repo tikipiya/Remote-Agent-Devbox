@@ -2,7 +2,8 @@ FROM node:22.15.0-bookworm-slim AS build
 
 WORKDIR /opt/rad
 COPY package.json package-lock.json tsconfig.json tsconfig.base.json ./
-COPY apps/validator ./apps/validator
+COPY apps ./apps
+COPY packages ./packages
 RUN npm ci --ignore-scripts && npm run build --workspace=@rad/validator
 
 FROM node:22.15.0-bookworm-slim

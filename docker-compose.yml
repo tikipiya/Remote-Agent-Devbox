@@ -36,6 +36,8 @@ services:
       RAD_CONTROL_NETWORK: ${RAD_CONTROL_NETWORK:-rad-control}
       RAD_WORKSPACE_NETWORK: ${RAD_WORKSPACE_NETWORK:-rad-workspace}
       RAD_WORKSPACE_IMAGE: ${RAD_WORKSPACE_IMAGE:-remote-agent-devbox-workspace-node:local}
+      RAD_ARTIFACT_VOLUME: ${RAD_ARTIFACT_VOLUME:-rad-artifacts}
+      RAD_VALIDATOR_IMAGE: ${RAD_VALIDATOR_IMAGE:-remote-agent-devbox-validator:local}
     depends_on:
       database:
         condition: service_healthy
@@ -57,6 +59,13 @@ services:
       dockerfile: images/workspace-node/Dockerfile
     profiles: ["build"]
 
+  validator-image:
+    image: ${RAD_VALIDATOR_IMAGE:-remote-agent-devbox-validator:local}
+    build:
+      context: .
+      dockerfile: images/validator/Dockerfile
+    profiles: ["build"]
+
 networks:
   control:
     name: ${RAD_CONTROL_NETWORK:-rad-control}
@@ -69,3 +78,4 @@ networks:
 volumes:
   postgres-data:
   artifact-data:
+    name: ${RAD_ARTIFACT_VOLUME:-rad-artifacts}

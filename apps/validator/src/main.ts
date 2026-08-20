@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { createReadStream } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +10,7 @@ import { parseRawDiff } from "./raw-diff.js";
 const sha1Pattern = /^[0-9a-f]{40}$/;
 const sha256Pattern = /^[0-9a-f]{64}$/;
 const baseRefPattern = /^refs\/remotes\/origin\/[A-Za-z0-9._/-]+$/;
-const bundlePathPattern = /^\/artifacts\/sha256\/[0-9a-f]{64}\.bundle$/;
+const bundlePathPattern = /^\/artifact\/artifact\.bundle$/;
 const maxCommandOutputBytes = 16 * 1024 * 1024;
 const maxFiles = 10_000;
 
@@ -26,6 +28,10 @@ async function main(): Promise<void> {
   const repositoryPath = join(workDirectory, "repository.git");
 
   try {
+    const observedDigest = await digestFile(input.bundlePath);
+    if (observedDigest !== input.artifactDigest) {
+      throw new Error("artifact bytes do not match the server-recorded digest");
+    }
     await runGit(["init", "--bare", repositoryPath]);
     await runGit(["-C", repositoryPath, "bundle", "verify", input.bundlePath]);
     await runGit([
@@ -74,6 +80,12 @@ async function main(): Promise<void> {
   } finally {
     await rm(workDirectory, { recursive: true, force: true });
   }
+}
+
+async function digestFile(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(path)) hash.update(chunk);
+  return hash.digest("hex");
 }
 
 function parseInput(arguments_: string[]): ValidatorInput {

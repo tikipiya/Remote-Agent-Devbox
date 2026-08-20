@@ -30,7 +30,7 @@ describe("ArtifactStore", () => {
 
     expect(first).toEqual({
       artifactDigest: expected,
-      storageKey: `${expected.replace(":", "/")}.bundle`,
+      storageKey: `${expected.replace(":", "/")}/artifact.bundle`,
       sizeBytes: bytes.length,
     });
     expect(second).toEqual(first);
