@@ -17,7 +17,7 @@ ENV NODE_ENV=production \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git procps tini \
     && rm -rf /var/lib/apt/lists/* \
-    && npm install --global "@openai/codex@${CODEX_VERSION}" "code-server@${CODE_SERVER_VERSION}" \
+    && npm install --global --unsafe-perm "@openai/codex@${CODEX_VERSION}" "code-server@${CODE_SERVER_VERSION}" \
     && npm cache clean --force \
     && useradd --uid 10001 --create-home --shell /bin/bash codex
 
