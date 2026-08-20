@@ -1,5 +1,7 @@
 # Milestone 2 - Approved Git Write Pipeline
 
+[日本語版](../ja/architecture/MILESTONE_2.md)
+
 ## Status
 
 Milestone 2 implements the Tier 1 human approval, exact final revalidation,

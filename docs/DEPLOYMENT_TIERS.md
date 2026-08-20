@@ -1,5 +1,7 @@
 # Deployment tiers
 
+[日本語版](./ja/DEPLOYMENT_TIERS.md)
+
 ## Implemented tier
 
 This release implements Tier 1 (Secure Personal / Small Team). The host,

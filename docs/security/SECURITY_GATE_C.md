@@ -1,5 +1,7 @@
 # Security Gate C - Controlled Git Write
 
+[日本語版](../ja/security/SECURITY_GATE_C.md)
+
 ## Enforced properties
 
 - Approval is bound to an immutable review digest, exact validator profile,

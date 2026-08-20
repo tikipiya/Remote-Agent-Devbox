@@ -1,5 +1,7 @@
 # Security Gate D - Operational Posture
 
+[日本語版](../ja/security/SECURITY_GATE_D.md)
+
 ## Enforced properties
 
 - Existing security metadata is never silently rewritten during startup.

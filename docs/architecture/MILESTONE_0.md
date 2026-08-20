@@ -1,5 +1,7 @@
 # Milestone 0 — Workspace Vertical Slice
 
+[日本語版](../ja/architecture/MILESTONE_0.md)
+
 ## Status
 
 Milestone 0 is implemented as a runnable foundation. The credential-isolated

@@ -1,5 +1,7 @@
 # Codex Identity Boundary
 
+[日本語版](../ja/architecture/CODEX_IDENTITY_BOUNDARY.md)
+
 ## Decision
 
 Codex model identity belongs to a short-lived trusted Agent Runner, not to the
