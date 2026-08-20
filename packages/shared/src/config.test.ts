@@ -17,6 +17,7 @@ describe("loadRuntimeConfig", () => {
     expect(config.RAD_ARTIFACT_MAX_BYTES).toBe(64 * 1024 * 1024);
     expect(config.RAD_ARTIFACT_VOLUME).toBe("rad-artifacts");
     expect(config.RAD_VALIDATOR_IMAGE_DIGEST).toBeUndefined();
+    expect(config.RAD_APPROVAL_TTL_SECONDS).toBe(3_600);
   });
 
   it("rejects non-canonical validator image digests", () => {
@@ -45,6 +46,20 @@ describe("loadRuntimeConfig", () => {
     expect(() =>
       loadRuntimeConfig({ ...validEnvironment, RAD_DISCORD_TOKEN: "secret" }),
     ).toThrow(/configured together/);
+  });
+
+  it("requires GitHub App credentials as one complete set", () => {
+    expect(() =>
+      loadRuntimeConfig({ ...validEnvironment, RAD_GITHUB_APP_ID: "123" }),
+    ).toThrow(/configured together/);
+    expect(
+      loadRuntimeConfig({
+        ...validEnvironment,
+        RAD_GITHUB_APP_ID: "123",
+        RAD_GITHUB_INSTALLATION_ID: "456",
+        RAD_GITHUB_PRIVATE_KEY_BASE64: "cGVt",
+      }).RAD_GITHUB_INSTALLATION_ID,
+    ).toBe(456);
   });
 
   it("allows startup without Codex identity but retains one when configured", () => {

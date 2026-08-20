@@ -44,6 +44,16 @@ function testServices(): ControlServices {
       validateArtifact: unavailable,
       get: unavailable,
     },
+    approvalService: {
+      request: unavailable,
+      get: unavailable,
+      approve: unavailable,
+      deny: unavailable,
+    },
+    gitOperationService: {
+      start: unavailable,
+      get: unavailable,
+    },
   };
 }
 

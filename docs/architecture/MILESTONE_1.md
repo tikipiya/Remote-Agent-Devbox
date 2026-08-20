@@ -4,7 +4,8 @@
 
 Milestone 1 implements the Tier 1 Git Artifact, networkless structural
 validation, CRF-1 canonicalization, and immutable Review Snapshot pipeline.
-Approval and Git write operations remain Milestone 2 work.
+Approval and Git write operations are implemented by
+[Milestone 2](./MILESTONE_2.md).
 
 ## Pipeline
 
@@ -74,4 +75,4 @@ digests and cross-check duplicated identity columns before returning data.
 - Existing PostgreSQL volumes require the new migration to be applied by an
   operator; init scripts run automatically only for fresh volumes.
 - Validator image build and digest pinning are separate operator steps.
-- Approval binding and controlled GitHub write are Milestone 2.
+- See Milestone 2 for approval binding and controlled GitHub writes.

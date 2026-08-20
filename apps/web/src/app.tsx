@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleDot,
+  CircleCheck,
   ExternalLink,
   GitBranch,
   LoaderCircle,
@@ -11,18 +12,24 @@ import {
   ShieldCheck,
   TerminalSquare,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
   captureArtifact,
+  decideApproval,
   getIdeUrl,
   getWorkspace,
   provisionWorkspace,
+  requestApproval,
   runTask,
   setWorkspaceState,
+  startGitOperation,
   validateArtifact,
   type ReviewSnapshot,
+  type ApprovalRequest,
+  type GitOperation,
   type Workspace,
 } from "./api";
 import { Button } from "./components/ui/button";
@@ -37,6 +44,8 @@ export function App(): React.JSX.Element {
   const [prompt, setPrompt] = useState("");
   const [taskResult, setTaskResult] = useState<string>();
   const [review, setReview] = useState<ReviewSnapshot>();
+  const [approval, setApproval] = useState<ApprovalRequest>();
+  const [gitOperation, setGitOperation] = useState<GitOperation>();
   const ownerUserId = useMemo(() => getOwnerId(), []);
 
   const workspaceQuery = useQuery({
@@ -71,7 +80,24 @@ export function App(): React.JSX.Element {
       const artifact = await captureArtifact(workspaceId!);
       return validateArtifact(artifact.id);
     },
-    onSuccess: setReview,
+    onSuccess: (nextReview) => {
+      setReview(nextReview);
+      setApproval(undefined);
+      setGitOperation(undefined);
+    },
+  });
+  const approvalRequest = useMutation({
+    mutationFn: () => requestApproval(review!.id, ownerUserId),
+    onSuccess: setApproval,
+  });
+  const approvalDecision = useMutation({
+    mutationFn: (decision: "APPROVE" | "DENY") =>
+      decideApproval(approval!.id, decision, ownerUserId),
+    onSuccess: setApproval,
+  });
+  const operationStart = useMutation({
+    mutationFn: () => startGitOperation(approval!.id),
+    onSuccess: setGitOperation,
   });
   const openIde = async (): Promise<void> => {
     const { url } = await getIdeUrl(workspaceId!);
@@ -81,7 +107,14 @@ export function App(): React.JSX.Element {
 
   const workspace = workspaceQuery.data;
   const error =
-    provision.error ?? transition.error ?? task.error ?? validation.error ?? workspaceQuery.error;
+    provision.error ??
+    transition.error ??
+    task.error ??
+    validation.error ??
+    approvalRequest.error ??
+    approvalDecision.error ??
+    operationStart.error ??
+    workspaceQuery.error;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#164e63_0,transparent_34%),linear-gradient(145deg,#020617_0%,#0f172a_55%,#07131c_100%)] px-5 py-10 text-slate-100">
@@ -210,7 +243,21 @@ export function App(): React.JSX.Element {
                 Capture and validate
               </Button>
             </div>
-            {review ? <ReviewSummary review={review} /> : null}
+            {review ? (
+              <ReviewSummary
+                review={review}
+                approval={approval}
+                operation={gitOperation}
+                isPending={
+                  approvalRequest.isPending ||
+                  approvalDecision.isPending ||
+                  operationStart.isPending
+                }
+                onRequest={() => approvalRequest.mutate()}
+                onDecision={(decision) => approvalDecision.mutate(decision)}
+                onStartOperation={() => operationStart.mutate()}
+              />
+            ) : null}
           </Card>
         </div>
         {error ? <p className="mt-5 rounded-lg border border-rose-400/20 bg-rose-400/10 p-3 text-sm text-rose-200">{error.message}</p> : null}
@@ -219,7 +266,23 @@ export function App(): React.JSX.Element {
   );
 }
 
-function ReviewSummary({ review }: { review: ReviewSnapshot }): React.JSX.Element {
+function ReviewSummary({
+  review,
+  approval,
+  operation,
+  isPending,
+  onRequest,
+  onDecision,
+  onStartOperation,
+}: {
+  review: ReviewSnapshot;
+  approval: ApprovalRequest | undefined;
+  operation: GitOperation | undefined;
+  isPending: boolean;
+  onRequest: () => void;
+  onDecision: (decision: "APPROVE" | "DENY") => void;
+  onStartOperation: () => void;
+}): React.JSX.Element {
   return (
     <div className="mt-5 space-y-4 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4">
       <div className="grid gap-3 md:grid-cols-4">
@@ -244,6 +307,71 @@ function ReviewSummary({ review }: { review: ReviewSnapshot }): React.JSX.Elemen
               <span className="break-all">{displayPath(file.pathBase64)}</span>
             </div>
           ))}
+        </div>
+      ) : null}
+      <div className="flex flex-col justify-between gap-3 border-t border-white/5 pt-4 md:flex-row md:items-center">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-slate-500">Human approval</div>
+          <div className="mt-1 text-xs text-slate-300">
+            {approval
+              ? `${approval.status}${approval.staleReason ? ` - ${approval.staleReason}` : ""}`
+              : "No approval request"}
+          </div>
+          {approval ? (
+            <div className="mt-1 text-[11px] text-slate-500">
+              Expires {new Date(approval.expiresAt).toLocaleString()}
+            </div>
+          ) : null}
+        </div>
+        <div className="flex gap-2">
+          {!approval || approval.status === "DENIED" || approval.status === "STALE" ? (
+            <Button size="sm" disabled={isPending} onClick={onRequest}>
+              {isPending ? <LoaderCircle className="animate-spin" size={14} /> : <ShieldCheck size={14} />}
+              {approval ? "Request again" : "Request approval"}
+            </Button>
+          ) : approval.status === "PENDING" ? (
+            <>
+              <Button size="sm" disabled={isPending} onClick={() => onDecision("APPROVE")}>
+                <CircleCheck size={14} /> Approve reviewed digest
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={isPending}
+                onClick={() => onDecision("DENY")}
+              >
+                <XCircle size={14} /> Deny
+              </Button>
+            </>
+          ) : approval.status === "APPROVED" && !operation ? (
+            <Button size="sm" disabled={isPending} onClick={onStartOperation}>
+              {isPending ? <LoaderCircle className="animate-spin" size={14} /> : <GitBranch size={14} />}
+              Create pull request
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      {operation ? (
+        <div className="rounded-lg border border-white/5 bg-black/20 p-3 text-xs text-slate-300">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>Git operation: {operation.state}</span>
+            <span className="font-mono text-slate-500">{operation.branchName}</span>
+          </div>
+          {operation.staleReason || operation.errorCode ? (
+            <div className="mt-2 text-rose-300">
+              {operation.staleReason ?? operation.errorCode}
+            </div>
+          ) : null}
+          {operation.pullRequestUrl ? (
+            <a
+              className="mt-2 inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
+              href={operation.pullRequestUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink size={13} /> Open pull request
+            </a>
+          ) : null}
         </div>
       ) : null}
     </div>

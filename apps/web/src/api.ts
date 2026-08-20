@@ -45,6 +45,46 @@ export interface ReviewSnapshot {
   };
 }
 
+export interface ApprovalRequest {
+  id: string;
+  reviewSnapshotId: string;
+  operationType: "CREATE_PULL_REQUEST";
+  reviewDigest: string;
+  validatorProfileDigest: string;
+  securityEpoch: number;
+  status: "PENDING" | "APPROVED" | "DENIED" | "STALE";
+  staleReason: string | null;
+  requestedBy: string;
+  requestedAt: string;
+  expiresAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+}
+
+export interface GitOperation {
+  id: string;
+  approvalId: string;
+  branchName: string;
+  targetCommit: string;
+  expectedRemoteHead: string | null;
+  reviewDigest: string;
+  validatorProfileDigest: string;
+  securityEpoch: number;
+  state:
+    | "PENDING"
+    | "VALIDATING"
+    | "WAITING_CREDENTIAL"
+    | "PUSHING"
+    | "SUCCEEDED"
+    | "FAILED"
+    | "CONFLICT"
+    | "CANCELLED"
+    | "STALE";
+  staleReason: string | null;
+  errorCode: string | null;
+  pullRequestUrl: string | null;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -100,3 +140,25 @@ export const captureArtifact = (workspaceId: string): Promise<GitArtifact> =>
 
 export const validateArtifact = (artifactId: string): Promise<ReviewSnapshot> =>
   request(`/api/artifacts/${artifactId}/validate`, { method: "POST" });
+
+export const requestApproval = (
+  reviewSnapshotId: string,
+  requestedBy: string,
+): Promise<ApprovalRequest> =>
+  request(`/api/reviews/${reviewSnapshotId}/approvals`, {
+    method: "POST",
+    body: JSON.stringify({ requestedBy }),
+  });
+
+export const decideApproval = (
+  approvalId: string,
+  decision: "APPROVE" | "DENY",
+  decidedBy: string,
+): Promise<ApprovalRequest> =>
+  request(`/api/approvals/${approvalId}/decision`, {
+    method: "POST",
+    body: JSON.stringify({ decision, decidedBy }),
+  });
+
+export const startGitOperation = (approvalId: string): Promise<GitOperation> =>
+  request(`/api/approvals/${approvalId}/git-operations`, { method: "POST" });

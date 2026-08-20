@@ -1,5 +1,11 @@
 import { loadRuntimeConfig } from "@rad/shared";
 import { PostgresAgentTaskRepository } from "@rad/agents";
+import { PostgresApprovalRepository } from "@rad/approvals";
+import {
+  PostgresCredentialLeaseRepository,
+  PostgresGitOperationRepository,
+} from "@rad/git-operations";
+import { GitHubAppTokenIssuer } from "@rad/github-token-issuer";
 import {
   PostgresGitArtifactRepository,
   PostgresReviewSnapshotRepository,
@@ -21,6 +27,13 @@ import { ArtifactService } from "./artifacts/artifact-service.js";
 import { ArtifactStore } from "./artifacts/artifact-store.js";
 import { DockerValidatorLauncher } from "./validation/docker-validator.js";
 import { ReviewService } from "./validation/review-service.js";
+import { ApprovalService } from "./approvals/approval-service.js";
+import { ExactRevalidator } from "./validation/exact-revalidator.js";
+import { GitOperationService } from "./git/git-operation-service.js";
+import { GitRemoteHeadObserver } from "./git/remote-head-observer.js";
+import { CredentialedGitWriteExecutor } from "./git/git-write-executor.js";
+import { TrustedGitWriter } from "./git/git-writer.js";
+import { GitHubPullRequestCreator } from "./git/github-pull-request.js";
 
 const config = loadRuntimeConfig();
 const { db, pool } = createDatabase(config.RAD_DATABASE_URL);
@@ -46,6 +59,11 @@ await repository.synchronizeSecurityMetadata({
     validatorCpus: config.RAD_VALIDATOR_CPUS,
     validatorPids: config.RAD_VALIDATOR_PIDS,
     validatorTimeoutMilliseconds: config.RAD_VALIDATOR_TIMEOUT_MS,
+    approvalTtlSeconds: config.RAD_APPROVAL_TTL_SECONDS,
+    githubApiUrl: config.RAD_GITHUB_API_URL,
+    githubAppId: config.RAD_GITHUB_APP_ID || null,
+    githubInstallationId: config.RAD_GITHUB_INSTALLATION_ID ?? null,
+    githubPrivateKeyConfigured: Boolean(config.RAD_GITHUB_PRIVATE_KEY_BASE64),
   }),
 });
 const commandRunner = new ExecFileCommandRunner();
@@ -66,18 +84,51 @@ const artifactStore = new ArtifactStore(
   config.RAD_ARTIFACT_MAX_BYTES,
 );
 await artifactStore.initialize();
+const artifactRepository = new PostgresGitArtifactRepository(db);
+const reviewRepository = new PostgresReviewSnapshotRepository(db);
+const approvalRepository = new PostgresApprovalRepository(db);
+const operationRepository = new PostgresGitOperationRepository(db);
+const credentialLeaseRepository = new PostgresCredentialLeaseRepository(db);
 const artifactService = new ArtifactService(
-  new PostgresGitArtifactRepository(db),
+  artifactRepository,
   repository,
   supervisor,
   artifactStore,
 );
 const reviewService = new ReviewService(
-  new PostgresGitArtifactRepository(db),
-  new PostgresReviewSnapshotRepository(db),
+  artifactRepository,
+  reviewRepository,
   repository,
   repository,
   new DockerValidatorLauncher(config, commandRunner),
+);
+const approvalService = new ApprovalService(
+  approvalRepository,
+  reviewRepository,
+  repository,
+  config.RAD_APPROVAL_TTL_SECONDS,
+);
+const gitOperationService = new GitOperationService(
+  approvalRepository,
+  reviewRepository,
+  artifactRepository,
+  repository,
+  operationRepository,
+  new GitRemoteHeadObserver(commandRunner),
+  new ExactRevalidator(
+    repository,
+    new DockerValidatorLauncher(config, commandRunner),
+  ),
+  new CredentialedGitWriteExecutor(
+    config,
+    operationRepository,
+    credentialLeaseRepository,
+    new GitHubAppTokenIssuer(config, repository),
+    new TrustedGitWriter(commandRunner),
+    new GitHubPullRequestCreator(config.RAD_GITHUB_API_URL),
+    repository,
+    artifactStore,
+  ),
 );
 const server = createControlServer({
   config,
@@ -88,6 +139,8 @@ const server = createControlServer({
   taskService,
   artifactService,
   reviewService,
+  approvalService,
+  gitOperationService,
 });
 
 const reconcileTimer = setInterval(() => {
