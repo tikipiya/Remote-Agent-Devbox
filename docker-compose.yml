@@ -73,6 +73,32 @@ services:
       dockerfile: images/validator/Dockerfile
     profiles: ["build"]
 
+  ide-proxy:
+    build:
+      context: .
+      dockerfile: images/ide-proxy/Dockerfile
+    restart: unless-stopped
+    environment:
+      RAD_IDE_PROXY_HOST: 0.0.0.0
+      RAD_IDE_PROXY_PORT: 3001
+      RAD_IDE_PROXY_PUBLIC_URL: ${RAD_IDE_PROXY_PUBLIC_URL:-http://127.0.0.1:3001}
+      RAD_CONTROL_INTERNAL_URL: http://control:3000
+      RAD_IDE_PROXY_SHARED_SECRET: ${RAD_IDE_PROXY_SHARED_SECRET:?RAD_IDE_PROXY_SHARED_SECRET is required}
+    depends_on:
+      - control
+    ports:
+      - "127.0.0.1:${RAD_IDE_PROXY_PORT:-3001}:3001"
+    networks:
+      - control
+      - workspace
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
 networks:
   control:
     name: ${RAD_CONTROL_NETWORK:-rad-control}

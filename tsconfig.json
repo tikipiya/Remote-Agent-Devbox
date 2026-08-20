@@ -12,6 +12,7 @@
     { "path": "./packages/outbox" },
     { "path": "./packages/ide-access" },
     { "path": "./apps/control" },
+    { "path": "./apps/ide-proxy" },
     { "path": "./apps/agent-worker" },
     { "path": "./apps/validator" },
     { "path": "./apps/web" }

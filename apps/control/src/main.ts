@@ -8,6 +8,7 @@ import {
   PostgresGitOperationRepository,
 } from "@rad/git-operations";
 import { GitHubAppTokenIssuer } from "@rad/github-token-issuer";
+import { IdeAccessService, PostgresIdeAccessRepository } from "@rad/ide-access";
 import {
   PostgresGitArtifactRepository,
   PostgresReviewSnapshotRepository,
@@ -87,6 +88,11 @@ const approvalRepository = new PostgresApprovalRepository(db);
 const operationRepository = new PostgresGitOperationRepository(db);
 const credentialLeaseRepository = new PostgresCredentialLeaseRepository(db);
 const auditEventRepository = new PostgresAuditEventRepository(db);
+const ideAccessService = new IdeAccessService(
+  new PostgresIdeAccessRepository(db),
+  config.RAD_IDE_ACCESS_CODE_TTL_SECONDS,
+  config.RAD_IDE_SESSION_TTL_SECONDS,
+);
 const artifactService = new ArtifactService(
   artifactRepository,
   repository,
@@ -133,7 +139,7 @@ const gitOperationService = new GitOperationService(
 const server = createControlServer({
   config,
   repository,
-  supervisor,
+  ideAccess: ideAccessService,
   reconciler,
   coordinator,
   taskService,

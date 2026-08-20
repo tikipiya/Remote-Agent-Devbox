@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { Buffer } from "node:buffer";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -19,8 +20,8 @@ import type {
   WorkspaceRepository,
 } from "@rad/workspace-state";
 import type { AuditEventRepository } from "@rad/audit-events";
+import { opaqueIdeTokenSchema, type IdeAccessService } from "@rad/ide-access";
 
-import type { DockerSandboxSupervisor } from "./workspace/docker-supervisor.js";
 import type { TaskService } from "./tasks/task-service.js";
 import type { ArtifactService } from "./artifacts/artifact-service.js";
 import type { ReviewService } from "./validation/review-service.js";
@@ -33,7 +34,7 @@ export interface ControlServices {
   repository: WorkspaceRepository;
   coordinator: Pick<WorkspaceCoordinator, "requestState">;
   reconciler: Pick<WorkspaceReconciler, "reconcile" | "reconcileAll">;
-  supervisor: Pick<DockerSandboxSupervisor, "getIdeUrl">;
+  ideAccess: Pick<IdeAccessService, "issue" | "redeem" | "resolve">;
   taskService: Pick<TaskService, "run" | "get">;
   artifactService: Pick<ArtifactService, "capture" | "get">;
   reviewService: Pick<ReviewService, "validateArtifact" | "get">;
@@ -67,6 +68,8 @@ const approvalDecisionBodySchema = z
   .object({ decision: z.enum(["APPROVE", "DENY"]), decidedBy: z.uuid() })
   .strict();
 const auditQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) });
+const ideRedeemBodySchema = z.object({ code: opaqueIdeTokenSchema }).strict();
+const ideResolveBodySchema = z.object({ sessionToken: opaqueIdeTokenSchema }).strict();
 
 export function createControlServer(services: ControlServices): FastifyInstance {
   const server = Fastify({
@@ -84,7 +87,11 @@ export function createControlServer(services: ControlServices): FastifyInstance 
       return;
     }
     if (error instanceof RadError) {
-      const status = error.code.endsWith("NOT_FOUND") ? 404 : 409;
+      const status = error.code.endsWith("NOT_FOUND")
+        ? 404
+        : error.code === "IDE_PROXY_UNAUTHORIZED"
+          ? 401
+          : 409;
       void reply.status(status).send({ error: error.code, message: error.message });
       return;
     }
@@ -150,11 +157,33 @@ export function createControlServer(services: ControlServices): FastifyInstance 
     return workspace;
   });
 
-  server.get("/api/workspaces/:id/ide", async (request) => {
+  server.post("/api/workspaces/:id/ide-access", async (request, reply) => {
+    await services.operationalGuard.assertAvailable("IDE access issuance");
+    requireIdeProxyConfiguration(services.config);
     const { id } = idParamsSchema.parse(request.params);
-    const workspace = await services.repository.getWorkspace(id);
-    if (!workspace) throw new RadError("WORKSPACE_NOT_FOUND", `Workspace ${id} not found`);
-    return { url: await services.supervisor.getIdeUrl(workspace) };
+    const access = await services.ideAccess.issue(id);
+    return reply
+      .header("cache-control", "no-store")
+      .header("referrer-policy", "no-referrer")
+      .status(201)
+      .send({
+        url: `${services.config.RAD_IDE_PROXY_PUBLIC_URL.replace(/\/$/, "")}/#access=${access.code}`,
+        expiresAt: access.expiresAt,
+      });
+  });
+
+  server.post("/internal/ide-access/redeem", async (request, reply) => {
+    assertIdeProxyAuthorization(request.headers.authorization, services.config);
+    const { code } = ideRedeemBodySchema.parse(request.body);
+    const session = await services.ideAccess.redeem(code);
+    return reply.header("cache-control", "no-store").send(session);
+  });
+
+  server.post("/internal/ide-access/resolve", async (request, reply) => {
+    assertIdeProxyAuthorization(request.headers.authorization, services.config);
+    const { sessionToken } = ideResolveBodySchema.parse(request.body);
+    const session = await services.ideAccess.resolve(sessionToken);
+    return reply.header("cache-control", "no-store").send(session);
   });
 
   server.patch("/api/workspaces/:id/state", async (request) => {
@@ -249,4 +278,26 @@ export function createControlServer(services: ControlServices): FastifyInstance 
   });
 
   return server;
+}
+
+function requireIdeProxyConfiguration(config: RuntimeConfig): string {
+  if (!config.RAD_IDE_PROXY_SHARED_SECRET) {
+    throw new RadError(
+      "IDE_PROXY_NOT_CONFIGURED",
+      "RAD_IDE_PROXY_SHARED_SECRET is required for IDE access",
+    );
+  }
+  return config.RAD_IDE_PROXY_SHARED_SECRET;
+}
+
+function assertIdeProxyAuthorization(
+  authorization: string | undefined,
+  config: RuntimeConfig,
+): void {
+  const secret = requireIdeProxyConfiguration(config);
+  const expected = Buffer.from(`Bearer ${secret}`, "utf8");
+  const received = Buffer.from(authorization ?? "", "utf8");
+  if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
+    throw new RadError("IDE_PROXY_UNAUTHORIZED", "IDE proxy authorization failed");
+  }
 }

@@ -41,6 +41,17 @@ export const runtimeConfigSchema = z
     RAD_VALIDATOR_PIDS: positiveInteger.min(16).max(512).default(64),
     RAD_VALIDATOR_TIMEOUT_MS: positiveInteger.min(1_000).max(600_000).default(120_000),
     RAD_APPROVAL_TTL_SECONDS: positiveInteger.min(60).max(86_400).default(3_600),
+    RAD_IDE_ACCESS_CODE_TTL_SECONDS: positiveInteger.min(10).max(600).default(60),
+    RAD_IDE_SESSION_TTL_SECONDS: positiveInteger.min(60).max(14_400).default(3_600),
+    RAD_IDE_PROXY_PUBLIC_URL: z
+      .url()
+      .refine(isHttpOrigin, "IDE proxy public URL must be an HTTP(S) origin")
+      .default("http://127.0.0.1:3001"),
+    RAD_IDE_PROXY_SHARED_SECRET: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{32,256}$/)
+      .optional()
+      .or(z.literal("")),
     RAD_GITHUB_API_URL: z.url().refine((url) => url.startsWith("https://")).default("https://api.github.com"),
     RAD_GITHUB_APP_ID: z.string().regex(/^\d+$/).optional().or(z.literal("")),
     RAD_GITHUB_INSTALLATION_ID: optionalPositiveInteger,
@@ -89,4 +100,16 @@ export function loadRuntimeConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): RuntimeConfig {
   return runtimeConfigSchema.parse(environment);
+}
+
+function isHttpOrigin(value: string): boolean {
+  const url = new URL(value);
+  return (
+    (url.protocol === "http:" || url.protocol === "https:") &&
+    url.pathname === "/" &&
+    !url.search &&
+    !url.hash &&
+    !url.username &&
+    !url.password
+  );
 }

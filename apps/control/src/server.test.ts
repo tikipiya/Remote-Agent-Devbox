@@ -29,8 +29,10 @@ function testServices(): ControlServices {
       reconcile: unavailable,
       reconcileAll: unavailable,
     },
-    supervisor: {
-      getIdeUrl: unavailable,
+    ideAccess: {
+      issue: unavailable,
+      redeem: unavailable,
+      resolve: unavailable,
     },
     taskService: {
       run: unavailable,
@@ -163,6 +165,76 @@ describe("control server", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json().error).toBe("INVALID_REQUEST");
+    await server.close();
+  });
+
+  it("issues a no-store one-time IDE URL only when the proxy is configured", async () => {
+    const services = testServices();
+    services.config = loadRuntimeConfig({
+      NODE_ENV: "test",
+      RAD_DATABASE_URL: "postgresql://rad:rad@db/rad",
+      RAD_WORKSPACE_IMAGE: "rad/workspace:local",
+      RAD_IDE_PROXY_PUBLIC_URL: "http://127.0.0.1:3001",
+      RAD_IDE_PROXY_SHARED_SECRET: "x".repeat(32),
+    });
+    services.ideAccess.issue = async (workspaceId) => ({
+      code: "a".repeat(43),
+      workspaceId,
+      expiresAt: new Date("2026-01-01T00:01:00Z"),
+    });
+    const server = createControlServer(services);
+
+    const response = await server.inject({
+      method: "POST",
+      url: "/api/workspaces/10000000-0000-4000-8000-000000000001/ide-access",
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      url: `http://127.0.0.1:3001/#access=${"a".repeat(43)}`,
+      expiresAt: "2026-01-01T00:01:00.000Z",
+    });
+    await server.close();
+  });
+
+  it("authenticates the IDE proxy before redeeming or resolving secrets", async () => {
+    const services = testServices();
+    const secret = "x".repeat(32);
+    services.config = loadRuntimeConfig({
+      NODE_ENV: "test",
+      RAD_DATABASE_URL: "postgresql://rad:rad@db/rad",
+      RAD_WORKSPACE_IMAGE: "rad/workspace:local",
+      RAD_IDE_PROXY_SHARED_SECRET: secret,
+    });
+    let redeemed = false;
+    services.ideAccess.redeem = async () => {
+      redeemed = true;
+      return {
+        sessionToken: "b".repeat(43),
+        workspaceId: "10000000-0000-4000-8000-000000000001",
+        expiresAt: new Date("2026-01-01T01:00:00Z"),
+      };
+    };
+    const server = createControlServer(services);
+
+    const rejected = await server.inject({
+      method: "POST",
+      url: "/internal/ide-access/redeem",
+      payload: { code: "a".repeat(43) },
+    });
+    expect(rejected.statusCode).toBe(401);
+    expect(redeemed).toBe(false);
+
+    const accepted = await server.inject({
+      method: "POST",
+      url: "/internal/ide-access/redeem",
+      headers: { authorization: `Bearer ${secret}` },
+      payload: { code: "a".repeat(43) },
+    });
+    expect(accepted.statusCode).toBe(200);
+    expect(accepted.headers["cache-control"]).toBe("no-store");
+    expect(redeemed).toBe(true);
     await server.close();
   });
 });

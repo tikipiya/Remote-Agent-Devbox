@@ -105,18 +105,6 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
     }
   }
 
-  public async getIdeUrl(workspace: Workspace): Promise<string | undefined> {
-    if ((await this.inspect(workspace)) !== "RUNNING") return undefined;
-    const result = await this.docker([
-      "container",
-      "port",
-      containerName(workspace.id),
-      "3000/tcp",
-    ]);
-    const match = /127\.0\.0\.1:(\d+)/.exec(result.stdout);
-    return match?.[1] ? `http://127.0.0.1:${match[1]}` : undefined;
-  }
-
   public async runTask(workspace: Workspace, task: string): Promise<AgentExecutionResult> {
     if ((await this.inspect(workspace)) !== "RUNNING") {
       throw new RadError("WORKSPACE_NOT_READY", `Workspace ${workspace.id} is not running`);
@@ -342,8 +330,6 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
       "/home/codex/.codex:rw,nosuid,nodev,size=64m,uid=10001,gid=10001",
       "--mount",
       `type=volume,source=${volumeName(workspace.id)},target=/workspace`,
-      "--publish",
-      "127.0.0.1::3000",
       "--env",
       `RAD_REPOSITORY_URL=${repository.remoteUrl}`,
       "--env",
