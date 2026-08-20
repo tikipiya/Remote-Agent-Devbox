@@ -6,7 +6,7 @@ COPY apps ./apps
 COPY packages ./packages
 RUN npm ci --ignore-scripts && npm run build && npm prune --omit=dev
 
-FROM node:22.15.0-bookworm-slim
+FROM node:24.19.0-bookworm-slim
 
 ARG CODEX_VERSION=0.148.0
 ARG CODE_SERVER_VERSION=4.133.0
