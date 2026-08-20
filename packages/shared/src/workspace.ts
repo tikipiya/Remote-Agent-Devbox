@@ -30,12 +30,27 @@ export type ObservedWorkspaceState = z.infer<
   typeof observedWorkspaceStateSchema
 >;
 
+export const gitRefNameSchema = z
+  .string()
+  .min(1)
+  .max(255)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/)
+  .refine(
+    (value) =>
+      !value.includes("..") &&
+      !value.includes("//") &&
+      !value.endsWith("/") &&
+      !value.endsWith(".") &&
+      !value.endsWith(".lock"),
+    { message: "Invalid Git reference name" },
+  );
+
 export const repositorySchema = z.object({
   id: z.uuid(),
   remoteUrl: z.url().refine((url) => url.startsWith("https://"), {
     message: "remoteUrl must use HTTPS",
   }),
-  defaultBranch: z.string().min(1).max(255),
+  defaultBranch: gitRefNameSchema,
   createdAt: z.date(),
 });
 
@@ -49,11 +64,7 @@ export const workspaceSchema = z.object({
   observedState: observedWorkspaceStateSchema,
   stateVersion: z.number().int().nonnegative(),
   sandboxBackend: z.literal("docker"),
-  branchName: z
-    .string()
-    .min(1)
-    .max(255)
-    .regex(/^agent\/[A-Za-z0-9._-]+$/),
+  branchName: gitRefNameSchema.regex(/^agent\/[A-Za-z0-9._-]+$/),
   createdAt: z.date(),
   expiresAt: z.date(),
   lastError: z.string().nullable(),

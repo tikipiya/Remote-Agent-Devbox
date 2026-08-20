@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/shared" },
-    { "path": "./packages/workspace-state" }
+    { "path": "./packages/workspace-state" },
+    { "path": "./apps/control" }
   ]
 }
