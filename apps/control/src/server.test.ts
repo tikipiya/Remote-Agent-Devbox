@@ -54,6 +54,17 @@ function testServices(): ControlServices {
       start: unavailable,
       get: unavailable,
     },
+    operationalGuard: {
+      assertAvailable: async () => ({
+        deploymentTier: 1,
+        securityEpoch: 1,
+        securityPostureHash: `sha256:${"a".repeat(64)}`,
+        maintenanceMode: false,
+        maintenanceReason: null,
+        maintenanceStartedAt: null,
+        updatedAt: new Date(),
+      }),
+    },
   };
 }
 

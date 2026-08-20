@@ -99,10 +99,10 @@ function metadata(securityEpoch: number) {
       securityEpoch,
       deploymentTier: 1,
       securityPostureHash: `sha256:${"a".repeat(64)}`,
+      maintenanceMode: false,
+      maintenanceReason: null,
+      maintenanceStartedAt: null,
       updatedAt: now,
     }),
-    synchronizeSecurityMetadata: async () => {
-      throw new Error("not used");
-    },
   };
 }

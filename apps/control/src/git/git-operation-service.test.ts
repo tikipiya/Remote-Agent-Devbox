@@ -160,6 +160,17 @@ function createService(
       assertReady: () => undefined,
       execute: async ({ operation }) => operation,
     },
+    {
+      assertAvailable: async () => ({
+        deploymentTier: 1,
+        securityEpoch: review.securityEpoch,
+        securityPostureHash: review.securityPostureHash,
+        maintenanceMode: false,
+        maintenanceReason: null,
+        maintenanceStartedAt: null,
+        updatedAt: now,
+      }),
+    },
     () => now,
   );
 }

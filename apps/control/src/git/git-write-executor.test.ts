@@ -194,11 +194,11 @@ function createExecutor(
         securityEpoch: 7,
         deploymentTier: 1,
         securityPostureHash: review.securityPostureHash,
+        maintenanceMode: false,
+        maintenanceReason: null,
+        maintenanceStartedAt: null,
         updatedAt: now,
       }),
-      synchronizeSecurityMetadata: async () => {
-        throw new Error("not used");
-      },
     },
     new ArtifactStore(resolve("rad-test"), 100),
     () => now,

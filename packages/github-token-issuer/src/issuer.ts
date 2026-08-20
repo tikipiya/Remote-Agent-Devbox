@@ -37,7 +37,7 @@ type Fetch = typeof fetch;
 export class GitHubAppTokenIssuer implements TokenIssuer {
   public constructor(
     private readonly config: GitHubIssuerConfig,
-    private readonly metadata: InstanceMetadataRepository,
+    private readonly metadata: Pick<InstanceMetadataRepository, "getSecurityMetadata">,
     private readonly request: Fetch = fetch,
     private readonly now: () => Date = () => new Date(),
   ) {}
@@ -58,10 +58,14 @@ export class GitHubAppTokenIssuer implements TokenIssuer {
       );
     }
     const metadata = await this.metadata.getSecurityMetadata();
-    if (!metadata || metadata.securityEpoch !== input.securityEpoch) {
+    if (
+      !metadata ||
+      metadata.maintenanceMode ||
+      metadata.securityEpoch !== input.securityEpoch
+    ) {
       throw new RadError(
         "TOKEN_SECURITY_EPOCH_MISMATCH",
-        "Security epoch changed before credential issuance",
+        "Security epoch changed or maintenance started before credential issuance",
       );
     }
     const repository = parseGitHubRepository(input.repositoryRemoteUrl);

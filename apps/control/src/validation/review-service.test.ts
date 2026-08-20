@@ -38,6 +38,9 @@ const securityMetadata: InstanceSecurityMetadata = {
   deploymentTier: 1,
   securityEpoch: 7,
   securityPostureHash: `sha256:${"9".repeat(64)}`,
+  maintenanceMode: false,
+  maintenanceReason: null,
+  maintenanceStartedAt: null,
   updatedAt: new Date("2026-01-01T00:00:00Z"),
 };
 
@@ -93,7 +96,6 @@ describe("ReviewService", () => {
       },
       {
         getSecurityMetadata: async () => securityMetadata,
-        synchronizeSecurityMetadata: async () => securityMetadata,
       },
       validator,
     );
@@ -131,7 +133,6 @@ describe("ReviewService", () => {
           ...securityMetadata,
           securityEpoch: readCount++ === 0 ? 7 : 8,
         }),
-        synchronizeSecurityMetadata: async () => securityMetadata,
       },
       {
         validate: async () => ({

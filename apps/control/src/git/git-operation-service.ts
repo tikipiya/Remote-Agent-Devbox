@@ -9,6 +9,7 @@ import type { WorkspaceRepository } from "@rad/workspace-state";
 import type { ExactRevalidator } from "../validation/exact-revalidator.js";
 import type { RemoteHeadObserver } from "./remote-head-observer.js";
 import type { GitOperationExecutor } from "./git-write-executor.js";
+import type { OperationalGuard } from "../security/maintenance-guard.js";
 
 export class GitOperationService {
   public constructor(
@@ -20,10 +21,12 @@ export class GitOperationService {
     private readonly remoteHeads: RemoteHeadObserver,
     private readonly revalidator: Pick<ExactRevalidator, "revalidate">,
     private readonly executor: GitOperationExecutor,
+    private readonly operationalGuard: OperationalGuard,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
   public async start(approvalId: string): Promise<GitOperation> {
+    await this.operationalGuard.assertAvailable("Git operation start");
     const approval = await this.requireApproval(approvalId);
     const review = await this.requireReview(approval);
     const artifact = await this.artifacts.get(review.artifactId);

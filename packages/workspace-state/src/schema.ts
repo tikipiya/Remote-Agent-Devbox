@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   check,
   index,
   pgTable,
@@ -60,12 +61,19 @@ export const instanceMetadata = pgTable(
     deploymentTier: bigint("deployment_tier", { mode: "number" }).notNull(),
     securityEpoch: bigint("security_epoch", { mode: "number" }).notNull().default(1),
     securityPostureHash: text("security_posture_hash").notNull(),
+    maintenanceMode: boolean("maintenance_mode").notNull().default(false),
+    maintenanceReason: text("maintenance_reason"),
+    maintenanceStartedAt: timestamp("maintenance_started_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     check("instance_metadata_singleton_check", sql`${table.singletonKey} = 'instance'`),
     check("instance_metadata_tier_check", sql`${table.deploymentTier} BETWEEN 1 AND 3`),
     check("instance_metadata_epoch_check", sql`${table.securityEpoch} > 0`),
+    check(
+      "instance_metadata_maintenance_check",
+      sql`(${table.maintenanceMode} AND ${table.maintenanceReason} IS NOT NULL AND ${table.maintenanceStartedAt} IS NOT NULL)
+        OR (NOT ${table.maintenanceMode} AND ${table.maintenanceReason} IS NULL AND ${table.maintenanceStartedAt} IS NULL)`,
+    ),
   ],
 );
-

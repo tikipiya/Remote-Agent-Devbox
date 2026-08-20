@@ -6,6 +6,9 @@ const stored = {
   deploymentTier: 1,
   securityEpoch: 42,
   securityPostureHash: `sha256:${"a".repeat(64)}`,
+  maintenanceMode: false,
+  maintenanceReason: null,
+  maintenanceStartedAt: null,
   updatedAt: new Date("2026-01-01T00:00:00Z"),
 };
 

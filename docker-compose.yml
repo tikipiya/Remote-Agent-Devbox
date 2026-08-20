@@ -23,6 +23,7 @@ services:
       - ./packages/git-artifacts/migrations/0002_review_snapshots.sql:/docker-entrypoint-initdb.d/004_review_snapshots.sql:ro
       - ./packages/approvals/migrations/0001_approval_requests.sql:/docker-entrypoint-initdb.d/005_approval_requests.sql:ro
       - ./packages/git-operations/migrations/0001_git_operations.sql:/docker-entrypoint-initdb.d/006_git_operations.sql:ro
+      - ./packages/workspace-state/migrations/0002_operational_posture.sql:/docker-entrypoint-initdb.d/007_operational_posture.sql:ro
     security_opt:
       - no-new-privileges:true
 

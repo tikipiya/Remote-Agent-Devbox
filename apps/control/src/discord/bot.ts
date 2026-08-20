@@ -19,12 +19,14 @@ import type {
 } from "@rad/workspace-state";
 
 import type { TaskService } from "../tasks/task-service.js";
+import type { OperationalGuard } from "../security/maintenance-guard.js";
 
 interface DiscordBotDependencies {
   config: RuntimeConfig;
   repository: WorkspaceRepository;
   reconciler: Pick<WorkspaceReconciler, "reconcile">;
   taskService: Pick<TaskService, "run">;
+  operationalGuard: OperationalGuard;
 }
 
 const command = new SlashCommandBuilder()
@@ -79,6 +81,7 @@ async function handleTaskCommand(
 ): Promise<void> {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   try {
+    await dependencies.operationalGuard.assertAvailable("Discord workspace creation");
     const input = commandInputSchema.parse({
       repository: interaction.options.getString("repository", true),
       task: interaction.options.getString("task", true),
@@ -130,4 +133,3 @@ function stableUserId(discordUserId: string): string {
   const hex = bytes.toString("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
-

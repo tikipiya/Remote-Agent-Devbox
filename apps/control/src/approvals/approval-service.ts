@@ -4,17 +4,20 @@ import type { ApprovalRepository, ApprovalRequest } from "@rad/approvals";
 import type { ReviewSnapshotRepository } from "@rad/git-artifacts";
 import { RadError } from "@rad/shared";
 import type { InstanceMetadataRepository } from "@rad/workspace-state";
+import type { OperationalGuard } from "../security/maintenance-guard.js";
 
 export class ApprovalService {
   public constructor(
     private readonly approvals: ApprovalRepository,
     private readonly reviews: Pick<ReviewSnapshotRepository, "get">,
-    private readonly metadata: InstanceMetadataRepository,
+    private readonly metadata: Pick<InstanceMetadataRepository, "getSecurityMetadata">,
     private readonly ttlSeconds: number,
+    private readonly operationalGuard: OperationalGuard,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
   public async request(reviewSnapshotId: string, requestedBy: string): Promise<ApprovalRequest> {
+    await this.operationalGuard.assertAvailable("Approval request");
     const existing = await this.approvals.findActiveByReview(reviewSnapshotId);
     if (existing) return existing;
 
@@ -58,7 +61,8 @@ export class ApprovalService {
     return this.approvals.get(id);
   }
 
-  public approve(id: string, decidedBy: string): Promise<ApprovalRequest> {
+  public async approve(id: string, decidedBy: string): Promise<ApprovalRequest> {
+    await this.operationalGuard.assertAvailable("Approval decision");
     return this.approvals.approve(id, decidedBy, this.now());
   }
 

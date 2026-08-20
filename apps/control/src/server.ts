@@ -24,6 +24,7 @@ import type { ArtifactService } from "./artifacts/artifact-service.js";
 import type { ReviewService } from "./validation/review-service.js";
 import type { ApprovalService } from "./approvals/approval-service.js";
 import type { GitOperationService } from "./git/git-operation-service.js";
+import type { OperationalGuard } from "./security/maintenance-guard.js";
 
 export interface ControlServices {
   config: RuntimeConfig;
@@ -36,6 +37,7 @@ export interface ControlServices {
   reviewService: Pick<ReviewService, "validateArtifact" | "get">;
   approvalService: Pick<ApprovalService, "request" | "get" | "approve" | "deny">;
   gitOperationService: Pick<GitOperationService, "start" | "get">;
+  operationalGuard: OperationalGuard;
 }
 
 const repositoryBodySchema = z.object({
@@ -93,6 +95,7 @@ export function createControlServer(services: ControlServices): FastifyInstance 
   }
 
   server.post("/api/repositories", async (request, reply) => {
+    await services.operationalGuard.assertAvailable("Repository creation");
     const input = repositoryBodySchema.parse(request.body);
     const repository = await services.repository.createRepository({
       id: randomUUID(),
@@ -102,6 +105,7 @@ export function createControlServer(services: ControlServices): FastifyInstance 
   });
 
   server.post("/api/workspaces", async (request, reply) => {
+    await services.operationalGuard.assertAvailable("Workspace creation");
     const input = workspaceBodySchema.parse(request.body);
     const id = randomUUID();
     const workspace = await services.repository.createWorkspace({
@@ -131,6 +135,9 @@ export function createControlServer(services: ControlServices): FastifyInstance 
   server.patch("/api/workspaces/:id/state", async (request) => {
     const { id } = idParamsSchema.parse(request.params);
     const { state } = stateBodySchema.parse(request.body);
+    if (state === "RUNNING") {
+      await services.operationalGuard.assertAvailable("Workspace start");
+    }
     return services.coordinator.requestState(id, state);
   });
 

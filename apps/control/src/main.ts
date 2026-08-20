@@ -34,6 +34,7 @@ import { GitRemoteHeadObserver } from "./git/remote-head-observer.js";
 import { CredentialedGitWriteExecutor } from "./git/git-write-executor.js";
 import { TrustedGitWriter } from "./git/git-writer.js";
 import { GitHubPullRequestCreator } from "./git/github-pull-request.js";
+import { MaintenanceModeGuard } from "./security/maintenance-guard.js";
 
 const config = loadRuntimeConfig();
 const { db, pool } = createDatabase(config.RAD_DATABASE_URL);
@@ -67,6 +68,7 @@ await repository.synchronizeSecurityMetadata({
   }),
 });
 const commandRunner = new ExecFileCommandRunner();
+const operationalGuard = new MaintenanceModeGuard(repository);
 const supervisor = new DockerSandboxSupervisor(
   config,
   commandRunner,
@@ -78,6 +80,7 @@ const taskService = new TaskService(
   new PostgresAgentTaskRepository(db),
   repository,
   supervisor,
+  operationalGuard,
 );
 const artifactStore = new ArtifactStore(
   config.RAD_ARTIFACT_ROOT,
@@ -107,6 +110,7 @@ const approvalService = new ApprovalService(
   reviewRepository,
   repository,
   config.RAD_APPROVAL_TTL_SECONDS,
+  operationalGuard,
 );
 const gitOperationService = new GitOperationService(
   approvalRepository,
@@ -129,6 +133,7 @@ const gitOperationService = new GitOperationService(
     repository,
     artifactStore,
   ),
+  operationalGuard,
 );
 const server = createControlServer({
   config,
@@ -141,6 +146,7 @@ const server = createControlServer({
   reviewService,
   approvalService,
   gitOperationService,
+  operationalGuard,
 });
 
 const reconcileTimer = setInterval(() => {
@@ -164,4 +170,5 @@ const discordBot = await startDiscordBot({
   repository,
   reconciler,
   taskService,
+  operationalGuard,
 });

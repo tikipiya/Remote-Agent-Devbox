@@ -51,6 +51,9 @@ export interface InstanceSecurityMetadata {
   deploymentTier: number;
   securityEpoch: number;
   securityPostureHash: string;
+  maintenanceMode: boolean;
+  maintenanceReason: string | null;
+  maintenanceStartedAt: Date | null;
   updatedAt: Date;
 }
 
@@ -60,6 +63,8 @@ export interface InstanceMetadataRepository {
     securityPostureHash: string;
   }): Promise<InstanceSecurityMetadata>;
   getSecurityMetadata(): Promise<InstanceSecurityMetadata | undefined>;
+  enterMaintenanceMode(reason: string, startedAt: Date): Promise<InstanceSecurityMetadata>;
+  exitMaintenanceMode(expectedEpoch: number, completedAt: Date): Promise<InstanceSecurityMetadata>;
 }
 
 export function createDatabase(databaseUrl: string): {
@@ -104,11 +109,69 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository, Instanc
         deploymentTier: instanceMetadata.deploymentTier,
         securityEpoch: instanceMetadata.securityEpoch,
         securityPostureHash: instanceMetadata.securityPostureHash,
+        maintenanceMode: instanceMetadata.maintenanceMode,
+        maintenanceReason: instanceMetadata.maintenanceReason,
+        maintenanceStartedAt: instanceMetadata.maintenanceStartedAt,
         updatedAt: instanceMetadata.updatedAt,
       })
       .from(instanceMetadata)
       .where(eq(instanceMetadata.singletonKey, "instance"))
       .limit(1);
+    return record;
+  }
+
+  public async enterMaintenanceMode(
+    reason: string,
+    startedAt: Date,
+  ): Promise<InstanceSecurityMetadata> {
+    const [record] = await this.db
+      .update(instanceMetadata)
+      .set({
+        maintenanceMode: true,
+        maintenanceReason: reason,
+        maintenanceStartedAt: startedAt,
+        updatedAt: startedAt,
+      })
+      .where(
+        and(
+          eq(instanceMetadata.singletonKey, "instance"),
+          eq(instanceMetadata.maintenanceMode, false),
+        ),
+      )
+      .returning();
+    if (record) return record;
+
+    const current = await this.getSecurityMetadata();
+    if (current?.maintenanceMode) return current;
+    throw new RadError("MAINTENANCE_MODE_ENTER_FAILED", "Security metadata is missing");
+  }
+
+  public async exitMaintenanceMode(
+    expectedEpoch: number,
+    completedAt: Date,
+  ): Promise<InstanceSecurityMetadata> {
+    const [record] = await this.db
+      .update(instanceMetadata)
+      .set({
+        maintenanceMode: false,
+        maintenanceReason: null,
+        maintenanceStartedAt: null,
+        updatedAt: completedAt,
+      })
+      .where(
+        and(
+          eq(instanceMetadata.singletonKey, "instance"),
+          eq(instanceMetadata.maintenanceMode, true),
+          eq(instanceMetadata.securityEpoch, expectedEpoch),
+        ),
+      )
+      .returning();
+    if (!record) {
+      throw new RadError(
+        "MAINTENANCE_MODE_EXIT_CONFLICT",
+        "Maintenance mode or security epoch changed before exit",
+      );
+    }
     return record;
   }
 
