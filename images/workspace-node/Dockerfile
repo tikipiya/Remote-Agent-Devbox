@@ -33,7 +33,9 @@ COPY --from=tools /usr/local/lib/node_modules /usr/local/lib/node_modules
 WORKDIR /opt/rad
 COPY --from=build /opt/rad/apps/agent-worker/dist ./agent-worker/dist
 COPY --from=build /opt/rad/packages/agents/dist ./packages/agents/dist
+COPY --from=build /opt/rad/packages/agents/package.json ./packages/agents/package.json
 COPY --from=build /opt/rad/packages/shared/dist ./packages/shared/dist
+COPY --from=build /opt/rad/packages/shared/package.json ./packages/shared/package.json
 COPY --from=build /opt/rad/node_modules ./node_modules
 COPY --chown=root:root images/workspace-node/entrypoint.sh /usr/local/bin/rad-workspace-entrypoint
 COPY --chown=root:root scripts/verify-codex-exec-boundary.mjs ./scripts/verify-codex-exec-boundary.mjs
