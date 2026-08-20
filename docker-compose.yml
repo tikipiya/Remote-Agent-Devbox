@@ -19,6 +19,8 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./packages/workspace-state/migrations/0001_workspace_state.sql:/docker-entrypoint-initdb.d/001_workspace_state.sql:ro
       - ./packages/agents/migrations/0001_agent_tasks.sql:/docker-entrypoint-initdb.d/002_agent_tasks.sql:ro
+      - ./packages/git-artifacts/migrations/0001_git_artifacts.sql:/docker-entrypoint-initdb.d/003_git_artifacts.sql:ro
+      - ./packages/git-artifacts/migrations/0002_review_snapshots.sql:/docker-entrypoint-initdb.d/004_review_snapshots.sql:ro
     security_opt:
       - no-new-privileges:true
 
@@ -35,6 +37,8 @@ services:
       RAD_CONTROL_NETWORK: ${RAD_CONTROL_NETWORK:-rad-control}
       RAD_WORKSPACE_NETWORK: ${RAD_WORKSPACE_NETWORK:-rad-workspace}
       RAD_WORKSPACE_IMAGE: ${RAD_WORKSPACE_IMAGE:-remote-agent-devbox-workspace-node:local}
+      RAD_ARTIFACT_VOLUME: ${RAD_ARTIFACT_VOLUME:-rad-artifacts}
+      RAD_VALIDATOR_IMAGE: ${RAD_VALIDATOR_IMAGE:-remote-agent-devbox-validator:local}
     depends_on:
       database:
         condition: service_healthy
@@ -45,6 +49,7 @@ services:
       - egress
     volumes:
       - ${RAD_DOCKER_SOCKET:-/run/user/1000/docker.sock}:/var/run/docker.sock
+      - artifact-data:/var/lib/rad/artifacts
     security_opt:
       - no-new-privileges:true
 
@@ -53,6 +58,13 @@ services:
     build:
       context: .
       dockerfile: images/workspace-node/Dockerfile
+    profiles: ["build"]
+
+  validator-image:
+    image: ${RAD_VALIDATOR_IMAGE:-remote-agent-devbox-validator:local}
+    build:
+      context: .
+      dockerfile: images/validator/Dockerfile
     profiles: ["build"]
 
 networks:
@@ -66,3 +78,5 @@ networks:
 
 volumes:
   postgres-data:
+  artifact-data:
+    name: ${RAD_ARTIFACT_VOLUME:-rad-artifacts}

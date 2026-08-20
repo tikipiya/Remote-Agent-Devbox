@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { randomUUID } from "node:crypto";
 
 import {
   RadError,
@@ -120,25 +121,28 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
     if ((await this.inspect(workspace)) !== "RUNNING") {
       throw new RadError("WORKSPACE_NOT_READY", `Workspace ${workspace.id} is not running`);
     }
+    if (!this.config.RAD_CODEX_API_KEY) {
+      throw new RadError(
+        "CODEX_IDENTITY_NOT_CONFIGURED",
+        "RAD_CODEX_API_KEY is required to run an agent task",
+      );
+    }
     const payload = Buffer.from(
-      JSON.stringify({ task, cwd: "/workspace/repository" }),
+      JSON.stringify({
+        task,
+        cwd: "/workspace/repository",
+        environmentId: workspace.id,
+        execServerUrl: "ws://127.0.0.1:4500",
+      }),
       "utf8",
     ).toString("base64url");
     const result = await this.commandRunner.run(
       "docker",
-      [
-        "container",
-        "exec",
-        "--user",
-        "10001:10001",
-        "--workdir",
-        "/workspace/repository",
-        containerName(workspace.id),
-        "node",
-        "/opt/rad/agent-worker/dist/main.js",
-        payload,
-      ],
-      { timeoutMs: 60 * 60 * 1000 },
+      this.createAgentRunnerArguments(workspace, payload),
+      {
+        timeoutMs: 60 * 60 * 1000,
+        env: agentRunnerEnvironment(this.config.RAD_CODEX_API_KEY),
+      },
     );
     const events = result.stdout
       .split(/\r?\n/)
@@ -158,6 +162,146 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
       turnId: completed.turnId,
       message: completed.message,
     };
+  }
+
+  public async exportGitBundle(
+    workspace: Workspace,
+    repository: Repository,
+    destinationPath: string,
+  ): Promise<void> {
+    if ((await this.inspect(workspace)) !== "RUNNING") {
+      throw new RadError("WORKSPACE_NOT_READY", `Workspace ${workspace.id} is not running`);
+    }
+    const workspacePath = `/tmp/rad-artifact-${randomUUID()}.bundle`;
+    const git = [
+      "container",
+      "exec",
+      "--user",
+      "10001:10001",
+      "--workdir",
+      "/workspace/repository",
+      containerName(workspace.id),
+      "git",
+      "-c",
+      "core.hooksPath=/dev/null",
+    ];
+
+    try {
+      const branch = await this.docker([...git, "symbolic-ref", "--short", "HEAD"]);
+      if (branch.stdout.trim() !== workspace.branchName) {
+        throw new RadError(
+          "ARTIFACT_BRANCH_MISMATCH",
+          `Workspace branch is not ${workspace.branchName}`,
+        );
+      }
+      const status = await this.docker([
+        ...git,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+      ]);
+      if (status.stdout.trim() !== "") {
+        throw new RadError(
+          "ARTIFACT_WORKTREE_DIRTY",
+          "Commit or discard Workspace changes before creating an artifact",
+        );
+      }
+
+      await this.docker(
+        [
+          ...git,
+          "bundle",
+          "create",
+          workspacePath,
+          "HEAD",
+          `refs/remotes/origin/${repository.defaultBranch}`,
+        ],
+        { timeoutMs: 120_000 },
+      );
+      const sizeResult = await this.docker([
+        "container",
+        "exec",
+        "--user",
+        "10001:10001",
+        containerName(workspace.id),
+        "/usr/bin/stat",
+        "--format=%s",
+        workspacePath,
+      ]);
+      const size = Number(sizeResult.stdout.trim());
+      if (
+        !Number.isSafeInteger(size) ||
+        size <= 0 ||
+        size > this.config.RAD_ARTIFACT_MAX_BYTES
+      ) {
+        throw new RadError(
+          "ARTIFACT_SIZE_INVALID",
+          `Workspace artifact size ${sizeResult.stdout.trim()} is outside the configured limit`,
+        );
+      }
+      await this.docker(
+        [
+          "container",
+          "cp",
+          `${containerName(workspace.id)}:${workspacePath}`,
+          destinationPath,
+        ],
+        { timeoutMs: 120_000 },
+      );
+    } finally {
+      try {
+        await this.docker([
+          "container",
+          "exec",
+          "--user",
+          "10001:10001",
+          containerName(workspace.id),
+          "/bin/rm",
+          "--force",
+          "--",
+          workspacePath,
+        ]);
+      } catch {
+        // The Workspace is untrusted and temporary. Stale tmpfs bytes carry no authority.
+      }
+    }
+  }
+
+  public createAgentRunnerArguments(
+    workspace: Workspace,
+    payload: string,
+  ): string[] {
+    return [
+      "container",
+      "run",
+      "--rm",
+      "--label",
+      `dev.rad.agent-workspace-id=${workspace.id}`,
+      "--network",
+      `container:${containerName(workspace.id)}`,
+      "--memory",
+      `${this.config.RAD_WORKSPACE_MEMORY_MB}m`,
+      "--cpus",
+      String(this.config.RAD_WORKSPACE_CPUS),
+      "--pids-limit",
+      String(this.config.RAD_WORKSPACE_PIDS),
+      "--cap-drop",
+      "ALL",
+      "--security-opt",
+      "no-new-privileges=true",
+      "--read-only",
+      "--tmpfs",
+      "/tmp:rw,noexec,nosuid,nodev,size=256m",
+      "--tmpfs",
+      "/home/codex/.codex:rw,nosuid,nodev,size=64m,uid=10001,gid=10001",
+      "--env",
+      "OPENAI_API_KEY",
+      "--entrypoint",
+      "node",
+      this.config.RAD_WORKSPACE_IMAGE,
+      "/opt/rad/agent-worker/dist/main.js",
+      payload,
+    ];
   }
 
   public createArguments(
@@ -212,8 +356,11 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
     ];
   }
 
-  private docker(args: readonly string[]): Promise<{ stdout: string; stderr: string }> {
-    return this.commandRunner.run("docker", args);
+  private docker(
+    args: readonly string[],
+    options?: { timeoutMs?: number; env?: NodeJS.ProcessEnv },
+  ): Promise<{ stdout: string; stderr: string }> {
+    return this.commandRunner.run("docker", args, options);
   }
 
   private async waitUntilHealthy(workspace: Workspace): Promise<void> {
@@ -254,6 +401,15 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
       }
     }
   }
+}
+
+function agentRunnerEnvironment(apiKey: string): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = { OPENAI_API_KEY: apiKey };
+  for (const name of ["PATH", "HOME", "LANG", "LC_ALL", "DOCKER_HOST"] as const) {
+    const value = process.env[name];
+    if (value !== undefined) environment[name] = value;
+  }
+  return environment;
 }
 
 function containerName(workspaceId: string): string {

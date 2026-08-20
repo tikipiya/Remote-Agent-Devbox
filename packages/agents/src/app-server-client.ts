@@ -24,6 +24,11 @@ interface TurnStartResult {
   turn: { id: string };
 }
 
+interface EnvironmentStatusResult {
+  status: "ready" | "pending" | "disconnected" | "unknown";
+  error?: string;
+}
+
 interface TurnCompletedParams {
   threadId: string;
   turn: {
@@ -43,6 +48,11 @@ export interface CodexTaskResult {
   threadId: string;
   turnId: string;
   message: string;
+}
+
+export interface CodexExecutionEnvironment {
+  environmentId: string;
+  execServerUrl: string;
 }
 
 export interface CodexAppServerOptions {
@@ -85,21 +95,64 @@ export class CodexAppServerClient {
         version: "0.0.0",
       },
       capabilities: {
-        experimentalApi: false,
+        experimentalApi: true,
         requestAttestation: false,
       },
     });
     this.notify("initialized");
   }
 
-  public async runTask(task: string, cwd: string): Promise<CodexTaskResult> {
+  public async connectEnvironment(
+    environment: CodexExecutionEnvironment,
+  ): Promise<void> {
+    await this.request("environment/add", {
+      environmentId: environment.environmentId,
+      execServerUrl: environment.execServerUrl,
+      connectTimeoutMs: this.requestTimeoutMs,
+    });
+    const deadline = Date.now() + this.requestTimeoutMs;
+    while (Date.now() < deadline) {
+      const status = await this.request<EnvironmentStatusResult>(
+        "environment/status",
+        { environmentId: environment.environmentId },
+      );
+      if (status.status === "ready") return;
+      if (status.status !== "pending") {
+        throw new RadError(
+          "CODEX_ENVIRONMENT_NOT_READY",
+          status.error ??
+            `Codex environment ${environment.environmentId} is ${status.status}`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new RadError(
+      "CODEX_ENVIRONMENT_NOT_READY",
+      `Codex environment ${environment.environmentId} did not become ready`,
+    );
+  }
+
+  public async runTask(
+    task: string,
+    cwd: string,
+    environment?: CodexExecutionEnvironment,
+  ): Promise<CodexTaskResult> {
+    const environments = environment
+      ? [
+          {
+            environmentId: environment.environmentId,
+            cwd,
+            runtimeWorkspaceRoots: [cwd],
+          },
+        ]
+      : [];
     const threadResult = await this.request<ThreadStartResult>("thread/start", {
       cwd,
       runtimeWorkspaceRoots: [cwd],
       approvalPolicy: "never",
       sandbox: "workspace-write",
       ephemeral: true,
-      environments: [],
+      environments,
     });
     const threadId = threadResult.thread.id;
     let message = "";
@@ -115,7 +168,7 @@ export class CodexAppServerClient {
         cwd,
         runtimeWorkspaceRoots: [cwd],
         approvalPolicy: "never",
-        environments: [],
+        environments,
       });
       const completion = await this.waitForTurn(turnResult.turn.id);
       if (completion.turn.status !== "completed") {
@@ -223,4 +276,3 @@ export class CodexAppServerClient {
     this.pending.clear();
   }
 }
-

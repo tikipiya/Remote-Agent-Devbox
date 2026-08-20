@@ -33,14 +33,19 @@ COPY --from=tools /usr/local/lib/node_modules /usr/local/lib/node_modules
 WORKDIR /opt/rad
 COPY --from=build /opt/rad/apps/agent-worker/dist ./agent-worker/dist
 COPY --from=build /opt/rad/packages/agents/dist ./packages/agents/dist
+COPY --from=build /opt/rad/packages/agents/package.json ./packages/agents/package.json
 COPY --from=build /opt/rad/packages/shared/dist ./packages/shared/dist
+COPY --from=build /opt/rad/packages/shared/package.json ./packages/shared/package.json
 COPY --from=build /opt/rad/node_modules ./node_modules
 COPY --chown=root:root images/workspace-node/entrypoint.sh /usr/local/bin/rad-workspace-entrypoint
+COPY --chown=root:root scripts/verify-codex-exec-boundary.mjs ./scripts/verify-codex-exec-boundary.mjs
 RUN chmod 0555 /usr/local/bin/rad-workspace-entrypoint
 
 USER 10001:10001
 WORKDIR /workspace
 EXPOSE 3000
 HEALTHCHECK --interval=2s --timeout=2s --start-period=120s --retries=5 \
-  CMD test -d /workspace/repository/.git && pgrep -f code-server >/dev/null
+  CMD test -d /workspace/repository/.git \
+    && pgrep -f code-server >/dev/null \
+    && pgrep -f 'codex exec-server' >/dev/null
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/rad-workspace-entrypoint"]

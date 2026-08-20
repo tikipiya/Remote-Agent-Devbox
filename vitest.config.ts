@@ -14,6 +14,9 @@ export default defineConfig({
       "@rad/workspace-state": fileURLToPath(
         new URL("./packages/workspace-state/src/index.ts", import.meta.url),
       ),
+      "@rad/git-artifacts": fileURLToPath(
+        new URL("./packages/git-artifacts/src/index.ts", import.meta.url),
+      ),
     },
   },
   test: {

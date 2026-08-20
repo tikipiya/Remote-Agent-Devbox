@@ -8,6 +8,10 @@ import { spawnCodexAppServer } from "@rad/agents";
 const inputSchema = z.object({
   task: z.string().min(1).max(64 * 1024),
   cwd: z.string().startsWith("/workspace/").default("/workspace/repository"),
+  environmentId: z.string().min(1).max(255),
+  execServerUrl: z.url().refine((url) => url.startsWith("ws://127.0.0.1:"), {
+    message: "execServerUrl must use workspace loopback",
+  }),
 });
 
 const encoded = process.argv[2];
@@ -20,7 +24,12 @@ const client = spawnCodexAppServer();
 try {
   process.stdout.write(`${JSON.stringify({ event: "task_started" })}\n`);
   await client.initialize();
-  const result = await client.runTask(input.task, input.cwd);
+  const environment = {
+    environmentId: input.environmentId,
+    execServerUrl: input.execServerUrl,
+  };
+  await client.connectEnvironment(environment);
+  const result = await client.runTask(input.task, input.cwd, environment);
   process.stdout.write(`${JSON.stringify({ event: "task_completed", ...result })}\n`);
 } catch (error) {
   const message = error instanceof Error ? error.message : "Unknown agent error";
@@ -29,4 +38,3 @@ try {
 } finally {
   await client.close();
 }
-

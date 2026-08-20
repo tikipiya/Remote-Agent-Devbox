@@ -4,8 +4,10 @@
     { "path": "./packages/shared" },
     { "path": "./packages/agents" },
     { "path": "./packages/workspace-state" },
+    { "path": "./packages/git-artifacts" },
     { "path": "./apps/control" },
     { "path": "./apps/agent-worker" },
+    { "path": "./apps/validator" },
     { "path": "./apps/web" }
   ]
 }

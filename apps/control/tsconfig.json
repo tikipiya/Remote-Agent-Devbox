@@ -8,6 +8,7 @@
   "references": [
     { "path": "../../packages/shared" },
     { "path": "../../packages/agents" },
+    { "path": "../../packages/git-artifacts" },
     { "path": "../../packages/workspace-state" }
   ],
   "include": ["src/**/*.ts"]

@@ -36,6 +36,14 @@ function testServices(): ControlServices {
       run: unavailable,
       get: unavailable,
     },
+    artifactService: {
+      capture: unavailable,
+      get: unavailable,
+    },
+    reviewService: {
+      validateArtifact: unavailable,
+      get: unavailable,
+    },
   };
 }
 
@@ -74,6 +82,18 @@ describe("control server", () => {
     });
 
     expect(response.statusCode).toBe(400);
+    await server.close();
+  });
+
+  it("validates artifact identifiers before repository lookup", async () => {
+    const server = createControlServer(testServices());
+    const response = await server.inject({
+      method: "GET",
+      url: "/api/artifacts/not-a-uuid",
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error).toBe("INVALID_REQUEST");
     await server.close();
   });
 });

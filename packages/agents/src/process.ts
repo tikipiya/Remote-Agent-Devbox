@@ -41,7 +41,15 @@ export function spawnCodexAppServer(): CodexAppServerClient {
 }
 
 function sanitizedEnvironment(): NodeJS.ProcessEnv {
-  const allowed = ["PATH", "HOME", "LANG", "LC_ALL", "TERM", "CODEX_HOME"] as const;
+  const allowed = [
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "TERM",
+    "CODEX_HOME",
+    "OPENAI_API_KEY",
+  ] as const;
   const environment: NodeJS.ProcessEnv = {};
   for (const name of allowed) {
     const value = process.env[name];
@@ -49,4 +57,3 @@ function sanitizedEnvironment(): NodeJS.ProcessEnv {
   }
   return environment;
 }
-

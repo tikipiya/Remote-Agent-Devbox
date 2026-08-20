@@ -2,19 +2,62 @@
 
 ## Local Tier 1 startup
 
-1. Install Node.js 22.15+, Rootless Docker, and Docker Compose.
-2. Copy `.env.example` to `.env` and replace the PostgreSQL password.
+1. Install Node.js 22.15+, Rootless Docker Engine 26+, and Docker Compose.
+2. Copy `.env.example` to `.env`, replace the PostgreSQL password, and set a
+   dedicated OpenAI project key as `RAD_CODEX_API_KEY`.
 3. Keep Discord variables empty unless a bot application is ready.
-4. Build and start:
+4. Build the images:
 
 ```bash
 npm ci --ignore-scripts
 npm run check
 docker compose --profile build build
+```
+
+5. Resolve the validator image ID and copy the complete `sha256:...` value to
+   `RAD_VALIDATOR_IMAGE_DIGEST` in `.env`:
+
+```bash
+docker image inspect --format '{{.Id}}' remote-agent-devbox-validator:local
+```
+
+6. Start the services:
+
+```bash
 docker compose up -d
 ```
 
 Open `http://127.0.0.1:3000`.
+
+Validation fails closed if the configured ID is absent or no longer matches
+the local image. Re-resolve and explicitly update it after rebuilding the
+validator. Run the standalone boundary check with a built image tagged
+`remote-agent-devbox-validator:ci`:
+
+```bash
+npm run verify:validator
+```
+
+## Codex identity
+
+The key remains in the Tier 1 control process and is forwarded only to a
+short-lived trusted Agent Runner. It is not placed in the Workspace environment
+or mounted filesystem. Do not use a personal shell's `CODEX_HOME` or a broadly
+privileged organization key.
+
+Verify the real App Server to Exec Server protocol without making a model call:
+
+```bash
+npm run verify:codex-boundary
+```
+
+After exporting `RAD_CODEX_API_KEY`, run the opt-in authenticated check. It
+makes a real model request and verifies that Codex edits a temporary repository
+through the Exec Server:
+
+```bash
+npm run verify:codex-task
+```
 
 ## Rootless Docker socket
 
@@ -47,4 +90,3 @@ docker compose down
 
 Add `--volumes` only when intentionally deleting PostgreSQL state. Workspace
 volumes are removed by the lifecycle destroy operation.
-

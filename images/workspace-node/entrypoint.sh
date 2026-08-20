@@ -3,6 +3,7 @@ set -eu
 
 umask 077
 unset GIT_ASKPASS SSH_ASKPASS SSH_AUTH_SOCK GITHUB_TOKEN GH_TOKEN
+unset OPENAI_API_KEY CODEX_ACCESS_TOKEN
 unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
 
 if [ ! -d /workspace/repository/.git ]; then
@@ -14,9 +15,13 @@ if [ ! -d /workspace/repository/.git ]; then
     -c "$RAD_AGENT_BRANCH"
 fi
 
+codex exec-server \
+  --listen ws://127.0.0.1:4500 \
+  --strict-config \
+  --disable multi_agent &
+
 exec code-server \
   --bind-addr 0.0.0.0:3000 \
   --auth none \
   --disable-telemetry \
   /workspace/repository
-

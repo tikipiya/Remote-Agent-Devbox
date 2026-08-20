@@ -20,6 +20,8 @@ import type {
 
 import type { DockerSandboxSupervisor } from "./workspace/docker-supervisor.js";
 import type { TaskService } from "./tasks/task-service.js";
+import type { ArtifactService } from "./artifacts/artifact-service.js";
+import type { ReviewService } from "./validation/review-service.js";
 
 export interface ControlServices {
   config: RuntimeConfig;
@@ -28,6 +30,8 @@ export interface ControlServices {
   reconciler: Pick<WorkspaceReconciler, "reconcile" | "reconcileAll">;
   supervisor: Pick<DockerSandboxSupervisor, "getIdeUrl">;
   taskService: Pick<TaskService, "run" | "get">;
+  artifactService: Pick<ArtifactService, "capture" | "get">;
+  reviewService: Pick<ReviewService, "validateArtifact" | "get">;
 }
 
 const repositoryBodySchema = z.object({
@@ -53,7 +57,7 @@ export function createControlServer(services: ControlServices): FastifyInstance 
   const server = Fastify({
     logger: services.config.NODE_ENV !== "test",
     bodyLimit: 64 * 1024,
-    requestTimeout: 30_000,
+    requestTimeout: Math.max(30_000, services.config.RAD_VALIDATOR_TIMEOUT_MS + 5_000),
   });
 
   server.setErrorHandler((error, _request, reply) => {
@@ -134,6 +138,35 @@ export function createControlServer(services: ControlServices): FastifyInstance 
     const task = await services.taskService.get(id);
     if (!task) throw new RadError("TASK_NOT_FOUND", `Task ${id} not found`);
     return task;
+  });
+
+  server.post("/api/workspaces/:id/artifacts", async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const artifact = await services.artifactService.capture(id);
+    return reply.status(201).send(artifact);
+  });
+
+  server.get("/api/artifacts/:id", async (request) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const artifact = await services.artifactService.get(id);
+    if (!artifact) {
+      throw new RadError("ARTIFACT_NOT_FOUND", `Artifact ${id} not found`);
+    }
+    return artifact;
+  });
+
+  server.post("/api/artifacts/:id/validate", async (request) => {
+    const { id } = idParamsSchema.parse(request.params);
+    return services.reviewService.validateArtifact(id);
+  });
+
+  server.get("/api/reviews/:id", async (request) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const review = await services.reviewService.get(id);
+    if (!review) {
+      throw new RadError("REVIEW_NOT_FOUND", `Review ${id} not found`);
+    }
+    return review;
   });
 
   return server;
