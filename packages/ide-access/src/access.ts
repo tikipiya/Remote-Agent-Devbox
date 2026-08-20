@@ -9,13 +9,19 @@ export const ideTokenDigestSchema = z.string().regex(/^sha256:[0-9a-f]{64}$/);
 
 export interface IssuedIdeAccessCode {
   code: string;
+  deploymentTier: number;
   expiresAt: Date;
+  securityEpoch: number;
+  workspaceStateVersion: number;
   workspaceId: string;
 }
 
 export interface RedeemedIdeAccessSession {
   sessionToken: string;
+  deploymentTier: number;
   expiresAt: Date;
+  securityEpoch: number;
+  workspaceStateVersion: number;
   workspaceId: string;
 }
 
@@ -43,7 +49,14 @@ export class IdeAccessService {
       expiresAt: new Date(createdAt.getTime() + this.codeTtlSeconds * 1_000),
       createdAt,
     });
-    return { code, expiresAt: record.expiresAt, workspaceId: record.workspaceId };
+    return {
+      code,
+      deploymentTier: record.deploymentTier,
+      expiresAt: record.expiresAt,
+      securityEpoch: record.securityEpoch,
+      workspaceStateVersion: record.workspaceStateVersion,
+      workspaceId: record.workspaceId,
+    };
   }
 
   public async redeem(code: string): Promise<RedeemedIdeAccessSession> {
@@ -59,7 +72,10 @@ export class IdeAccessService {
     });
     return {
       sessionToken,
+      deploymentTier: record.deploymentTier,
       expiresAt: record.expiresAt,
+      securityEpoch: record.securityEpoch,
+      workspaceStateVersion: record.workspaceStateVersion,
       workspaceId: record.workspaceId,
     };
   }

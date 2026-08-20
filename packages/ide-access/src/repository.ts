@@ -24,6 +24,7 @@ export const ideAccessCodes = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     codeDigest: text("code_digest").notNull().unique(),
+    deploymentTier: bigint("deployment_tier", { mode: "number" }).notNull(),
     securityEpoch: bigint("security_epoch", { mode: "number" }).notNull(),
     workspaceStateVersion: bigint("workspace_state_version", { mode: "number" }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
@@ -34,6 +35,8 @@ export const ideAccessCodes = pgTable(
   (table) => [
     index("ide_access_codes_workspace_idx").on(table.workspaceId, table.expiresAt),
     check("ide_access_codes_epoch_check", sql`${table.securityEpoch} > 0`),
+    check("ide_access_codes_tier_check", sql`${table.deploymentTier} BETWEEN 1 AND 3`),
+    check("ide_access_codes_digest_check", sql`${table.codeDigest} ~ '^sha256:[0-9a-f]{64}$'`),
     check("ide_access_codes_state_version_check", sql`${table.workspaceStateVersion} >= 0`),
     check("ide_access_codes_expiry_check", sql`${table.expiresAt} > ${table.createdAt}`),
     check(
@@ -51,6 +54,7 @@ export const ideAccessSessions = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     sessionDigest: text("session_digest").notNull().unique(),
+    deploymentTier: bigint("deployment_tier", { mode: "number" }).notNull(),
     securityEpoch: bigint("security_epoch", { mode: "number" }).notNull(),
     workspaceStateVersion: bigint("workspace_state_version", { mode: "number" }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
@@ -60,6 +64,11 @@ export const ideAccessSessions = pgTable(
   (table) => [
     index("ide_access_sessions_workspace_idx").on(table.workspaceId, table.expiresAt),
     check("ide_access_sessions_epoch_check", sql`${table.securityEpoch} > 0`),
+    check("ide_access_sessions_tier_check", sql`${table.deploymentTier} BETWEEN 1 AND 3`),
+    check(
+      "ide_access_sessions_digest_check",
+      sql`${table.sessionDigest} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
     check("ide_access_sessions_state_version_check", sql`${table.workspaceStateVersion} >= 0`),
     check("ide_access_sessions_expiry_check", sql`${table.expiresAt} > ${table.createdAt}`),
   ],
@@ -69,6 +78,7 @@ export interface IdeAccessCodeRecord {
   id: string;
   workspaceId: string;
   codeDigest: string;
+  deploymentTier: number;
   securityEpoch: number;
   workspaceStateVersion: number;
   createdAt: Date;
@@ -81,6 +91,7 @@ export interface IdeAccessSessionRecord {
   id: string;
   workspaceId: string;
   sessionDigest: string;
+  deploymentTier: number;
   securityEpoch: number;
   workspaceStateVersion: number;
   createdAt: Date;
@@ -143,6 +154,7 @@ export class PostgresIdeAccessRepository implements IdeAccessRepository {
         .insert(ideAccessCodes)
         .values({
           ...input,
+          deploymentTier: context.metadata.deploymentTier,
           securityEpoch: context.metadata.securityEpoch,
           workspaceStateVersion: context.workspace.stateVersion,
         })
@@ -214,6 +226,7 @@ export class PostgresIdeAccessRepository implements IdeAccessRepository {
           id: input.sessionId,
           workspaceId: code.workspaceId,
           sessionDigest: input.sessionDigest,
+          deploymentTier: code.deploymentTier,
           securityEpoch: code.securityEpoch,
           workspaceStateVersion: code.workspaceStateVersion,
           createdAt: input.redeemedAt,

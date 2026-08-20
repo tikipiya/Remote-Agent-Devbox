@@ -179,7 +179,10 @@ describe("control server", () => {
     });
     services.ideAccess.issue = async (workspaceId) => ({
       code: "a".repeat(43),
+      deploymentTier: 1,
       workspaceId,
+      securityEpoch: 1,
+      workspaceStateVersion: 3,
       expiresAt: new Date("2026-01-01T00:01:00Z"),
     });
     const server = createControlServer(services);
@@ -187,6 +190,7 @@ describe("control server", () => {
     const response = await server.inject({
       method: "POST",
       url: "/api/workspaces/10000000-0000-4000-8000-000000000001/ide-access",
+      payload: { requestedBy: "20000000-0000-4000-8000-000000000001" },
     });
 
     expect(response.statusCode).toBe(201);
@@ -212,7 +216,10 @@ describe("control server", () => {
       redeemed = true;
       return {
         sessionToken: "b".repeat(43),
+        deploymentTier: 1,
         workspaceId: "10000000-0000-4000-8000-000000000001",
+        securityEpoch: 1,
+        workspaceStateVersion: 3,
         expiresAt: new Date("2026-01-01T01:00:00Z"),
       };
     };

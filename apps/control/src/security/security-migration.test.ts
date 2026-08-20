@@ -107,6 +107,8 @@ function fixture() {
         staleApprovals: 2,
         cancelledOperations: 1,
         invalidatedLeases: 1,
+        invalidatedIdeCodes: 1,
+        revokedIdeSessions: 1,
         stoppedWorkspaces: 1,
       };
     },

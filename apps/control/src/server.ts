@@ -20,7 +20,7 @@ import type {
   WorkspaceRepository,
 } from "@rad/workspace-state";
 import type { AuditEventRepository } from "@rad/audit-events";
-import { opaqueIdeTokenSchema, type IdeAccessService } from "@rad/ide-access";
+import { opaqueIdeTokenSchema } from "@rad/ide-access";
 
 import type { TaskService } from "./tasks/task-service.js";
 import type { ArtifactService } from "./artifacts/artifact-service.js";
@@ -28,13 +28,14 @@ import type { ReviewService } from "./validation/review-service.js";
 import type { ApprovalService } from "./approvals/approval-service.js";
 import type { GitOperationService } from "./git/git-operation-service.js";
 import type { OperationalGuard } from "./security/maintenance-guard.js";
+import type { ControlIdeAccessService } from "./ide/ide-access-service.js";
 
 export interface ControlServices {
   config: RuntimeConfig;
   repository: WorkspaceRepository;
   coordinator: Pick<WorkspaceCoordinator, "requestState">;
   reconciler: Pick<WorkspaceReconciler, "reconcile" | "reconcileAll">;
-  ideAccess: Pick<IdeAccessService, "issue" | "redeem" | "resolve">;
+  ideAccess: ControlIdeAccessService;
   taskService: Pick<TaskService, "run" | "get">;
   artifactService: Pick<ArtifactService, "capture" | "get">;
   reviewService: Pick<ReviewService, "validateArtifact" | "get">;
@@ -70,6 +71,7 @@ const approvalDecisionBodySchema = z
 const auditQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) });
 const ideRedeemBodySchema = z.object({ code: opaqueIdeTokenSchema }).strict();
 const ideResolveBodySchema = z.object({ sessionToken: opaqueIdeTokenSchema }).strict();
+const ideIssueBodySchema = z.object({ requestedBy: z.uuid() }).strict();
 
 export function createControlServer(services: ControlServices): FastifyInstance {
   const server = Fastify({
@@ -161,7 +163,8 @@ export function createControlServer(services: ControlServices): FastifyInstance 
     await services.operationalGuard.assertAvailable("IDE access issuance");
     requireIdeProxyConfiguration(services.config);
     const { id } = idParamsSchema.parse(request.params);
-    const access = await services.ideAccess.issue(id);
+    const { requestedBy } = ideIssueBodySchema.parse(request.body);
+    const access = await services.ideAccess.issue(id, requestedBy);
     return reply
       .header("cache-control", "no-store")
       .header("referrer-policy", "no-referrer")
@@ -176,7 +179,11 @@ export function createControlServer(services: ControlServices): FastifyInstance 
     assertIdeProxyAuthorization(request.headers.authorization, services.config);
     const { code } = ideRedeemBodySchema.parse(request.body);
     const session = await services.ideAccess.redeem(code);
-    return reply.header("cache-control", "no-store").send(session);
+    return reply.header("cache-control", "no-store").send({
+      sessionToken: session.sessionToken,
+      workspaceId: session.workspaceId,
+      expiresAt: session.expiresAt,
+    });
   });
 
   server.post("/internal/ide-access/resolve", async (request, reply) => {

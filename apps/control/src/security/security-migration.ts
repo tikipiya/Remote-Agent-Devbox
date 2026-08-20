@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 
@@ -8,6 +8,7 @@ import { auditEvents, type AuditEventRepository } from "@rad/audit-events";
 import { approvalRequests } from "@rad/approvals";
 import { sha256DigestSchema, type Sha256Digest } from "@rad/git-artifacts";
 import { credentialLeases, gitOperations } from "@rad/git-operations";
+import { ideAccessCodes, ideAccessSessions } from "@rad/ide-access";
 import { RadError } from "@rad/shared";
 import {
   instanceMetadata,
@@ -31,6 +32,8 @@ export interface SecurityMigrationResult {
   staleApprovals: number;
   cancelledOperations: number;
   invalidatedLeases: number;
+  invalidatedIdeCodes: number;
+  revokedIdeSessions: number;
   stoppedWorkspaces: number;
 }
 
@@ -196,6 +199,22 @@ export class PostgresSecurityMigrationRepository implements SecurityMigrationRep
         .where(eq(credentialLeases.state, "ISSUED"))
         .returning({ id: credentialLeases.id });
 
+      const invalidatedIdeCodes = await transaction
+        .update(ideAccessCodes)
+        .set({ invalidatedAt: input.completedAt })
+        .where(
+          and(
+            isNull(ideAccessCodes.consumedAt),
+            isNull(ideAccessCodes.invalidatedAt),
+          ),
+        )
+        .returning({ id: ideAccessCodes.id });
+      const revokedIdeSessions = await transaction
+        .update(ideAccessSessions)
+        .set({ revokedAt: input.completedAt })
+        .where(isNull(ideAccessSessions.revokedAt))
+        .returning({ id: ideAccessSessions.id });
+
       const stoppedWorkspaces = await transaction
         .update(workspaces)
         .set({
@@ -230,6 +249,8 @@ export class PostgresSecurityMigrationRepository implements SecurityMigrationRep
         staleApprovals: staleApprovals.length,
         cancelledOperations: cancelledOperations.length,
         invalidatedLeases: failedReservations.length + expiredCredentials.length,
+        invalidatedIdeCodes: invalidatedIdeCodes.length,
+        revokedIdeSessions: revokedIdeSessions.length,
         stoppedWorkspaces: stoppedWorkspaces.length,
       };
       await transaction.insert(auditEvents).values([

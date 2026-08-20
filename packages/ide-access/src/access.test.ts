@@ -23,6 +23,7 @@ class RecordingRepository implements IdeAccessRepository {
     this.issued = input;
     return {
       ...input,
+      deploymentTier: 1,
       securityEpoch: 7,
       workspaceStateVersion: 3,
       consumedAt: null,
@@ -36,6 +37,7 @@ class RecordingRepository implements IdeAccessRepository {
       id: input.sessionId,
       workspaceId: "10000000-0000-4000-8000-000000000001",
       sessionDigest: input.sessionDigest,
+      deploymentTier: 1,
       securityEpoch: 7,
       workspaceStateVersion: 3,
       createdAt: input.redeemedAt,
@@ -53,6 +55,7 @@ class RecordingRepository implements IdeAccessRepository {
       id: "20000000-0000-4000-8000-000000000001",
       workspaceId: "10000000-0000-4000-8000-000000000001",
       sessionDigest: digest,
+      deploymentTier: 1,
       securityEpoch: 7,
       workspaceStateVersion: 3,
       createdAt: now,
