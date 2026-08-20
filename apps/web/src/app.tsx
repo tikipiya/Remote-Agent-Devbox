@@ -4,20 +4,25 @@ import {
   ExternalLink,
   GitBranch,
   LoaderCircle,
+  PackageCheck,
   Play,
   Power,
   Square,
+  ShieldCheck,
   TerminalSquare,
   Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
+  captureArtifact,
   getIdeUrl,
   getWorkspace,
   provisionWorkspace,
   runTask,
   setWorkspaceState,
+  validateArtifact,
+  type ReviewSnapshot,
   type Workspace,
 } from "./api";
 import { Button } from "./components/ui/button";
@@ -31,6 +36,7 @@ export function App(): React.JSX.Element {
   const [workspaceId, setWorkspaceId] = useState<string>();
   const [prompt, setPrompt] = useState("");
   const [taskResult, setTaskResult] = useState<string>();
+  const [review, setReview] = useState<ReviewSnapshot>();
   const ownerUserId = useMemo(() => getOwnerId(), []);
 
   const workspaceQuery = useQuery({
@@ -60,6 +66,13 @@ export function App(): React.JSX.Element {
       void workspaceQuery.refetch();
     },
   });
+  const validation = useMutation({
+    mutationFn: async () => {
+      const artifact = await captureArtifact(workspaceId!);
+      return validateArtifact(artifact.id);
+    },
+    onSuccess: setReview,
+  });
   const openIde = async (): Promise<void> => {
     const { url } = await getIdeUrl(workspaceId!);
     if (!url) throw new Error("IDE is not available");
@@ -67,7 +80,8 @@ export function App(): React.JSX.Element {
   };
 
   const workspace = workspaceQuery.data;
-  const error = provision.error ?? transition.error ?? task.error ?? workspaceQuery.error;
+  const error =
+    provision.error ?? transition.error ?? task.error ?? validation.error ?? workspaceQuery.error;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#164e63_0,transparent_34%),linear-gradient(145deg,#020617_0%,#0f172a_55%,#07131c_100%)] px-5 py-10 text-slate-100">
@@ -173,11 +187,93 @@ export function App(): React.JSX.Element {
               </pre>
             </div>
           </Card>
+
+          <Card className="lg:col-span-2">
+            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+              <div>
+                <SectionTitle icon={<ShieldCheck size={18} />} title="Immutable review" />
+                <p className="mt-2 text-xs leading-5 text-slate-400">
+                  Capture committed workspace state, validate it without network access, and bind the result to CRF-1.
+                </p>
+              </div>
+              <Button
+                disabled={
+                  !workspace || workspace.observedState !== "READY" || validation.isPending
+                }
+                onClick={() => validation.mutate()}
+              >
+                {validation.isPending ? (
+                  <LoaderCircle className="animate-spin" size={16} />
+                ) : (
+                  <PackageCheck size={16} />
+                )}
+                Capture and validate
+              </Button>
+            </div>
+            {review ? <ReviewSummary review={review} /> : null}
+          </Card>
         </div>
         {error ? <p className="mt-5 rounded-lg border border-rose-400/20 bg-rose-400/10 p-3 text-sm text-rose-200">{error.message}</p> : null}
       </div>
     </main>
   );
+}
+
+function ReviewSummary({ review }: { review: ReviewSnapshot }): React.JSX.Element {
+  return (
+    <div className="mt-5 space-y-4 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <Metric label="CRF" value="CRF-1" accent />
+        <Metric label="Tier" value={String(review.deploymentTier)} />
+        <Metric label="Security epoch" value={String(review.securityEpoch)} />
+        <Metric label="Changed files" value={String(review.structuralManifest.files.length)} />
+      </div>
+      <Digest label="Review digest" value={review.reviewDigest} />
+      <Digest label="Artifact digest" value={review.artifactDigest} />
+      <Digest label="Validator profile" value={review.validatorProfileDigest} />
+      <div className="grid gap-3 md:grid-cols-3">
+        <Commit label="Base" value={review.structuralManifest.baseCommit} />
+        <Commit label="Target" value={review.structuralManifest.targetCommit} />
+        <Commit label="Tree" value={review.structuralManifest.targetTree} />
+      </div>
+      {review.structuralManifest.files.length > 0 ? (
+        <div className="max-h-44 overflow-auto rounded-lg bg-black/20 p-3 font-mono text-xs text-slate-300">
+          {review.structuralManifest.files.map((file) => (
+            <div className="flex gap-3 py-1" key={`${file.status}:${file.pathBase64}`}>
+              <span className="w-4 text-cyan-300">{file.status}</span>
+              <span className="break-all">{displayPath(file.pathBase64)}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Digest({ label, value }: { label: string; value: string }): React.JSX.Element {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-widest text-slate-500">{label}</div>
+      <div className="mt-1 break-all font-mono text-xs text-slate-300">{value}</div>
+    </div>
+  );
+}
+
+function Commit({ label, value }: { label: string; value: string }): React.JSX.Element {
+  return (
+    <div className="rounded-lg bg-black/20 p-3">
+      <div className="text-[10px] uppercase tracking-widest text-slate-500">{label}</div>
+      <div className="mt-1 truncate font-mono text-xs text-slate-300" title={value}>
+        {value.slice(0, 12)}
+      </div>
+    </div>
+  );
+}
+
+function displayPath(pathBase64: string): string {
+  const bytes = Uint8Array.from(atob(pathBase64), (character) => character.charCodeAt(0));
+  const decoded = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+  return decoded.includes("\uFFFD") ? `base64:${pathBase64}` : decoded;
 }
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }): React.JSX.Element {

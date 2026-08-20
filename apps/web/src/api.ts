@@ -15,6 +15,36 @@ export interface AgentTask {
   error: string | null;
 }
 
+export interface GitArtifact {
+  id: string;
+  workspaceId: string;
+  repositoryId: string;
+  artifactDigest: string;
+  sizeBytes: number;
+  status: "STAGED" | "VALIDATED" | "REJECTED";
+}
+
+export interface ReviewSnapshot {
+  id: string;
+  artifactId: string;
+  reviewDigest: string;
+  artifactDigest: string;
+  validatorProfileDigest: string;
+  validatorProfile: {
+    imageDigest: string;
+    gitBinaryDigest: string;
+    policyDigest: string;
+  };
+  securityEpoch: number;
+  deploymentTier: number;
+  structuralManifest: {
+    baseCommit: string;
+    targetCommit: string;
+    targetTree: string;
+    files: Array<{ pathBase64: string; status: "A" | "D" | "M" | "T" }>;
+  };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -65,3 +95,8 @@ export const runTask = (
     body: JSON.stringify({ prompt, requestedBy }),
   });
 
+export const captureArtifact = (workspaceId: string): Promise<GitArtifact> =>
+  request(`/api/workspaces/${workspaceId}/artifacts`, { method: "POST" });
+
+export const validateArtifact = (artifactId: string): Promise<ReviewSnapshot> =>
+  request(`/api/artifacts/${artifactId}/validate`, { method: "POST" });
