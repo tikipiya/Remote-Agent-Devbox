@@ -39,6 +39,31 @@ class HealthyWorkspaceRunner extends RecordingRunner {
   }
 }
 
+class AgentTaskRunner extends HealthyWorkspaceRunner {
+  public agentEnvironment: NodeJS.ProcessEnv | undefined;
+
+  public override async run(
+    executable: string,
+    args: readonly string[],
+    options?: { timeoutMs?: number; env?: NodeJS.ProcessEnv },
+  ): Promise<CommandResult> {
+    if (args[0] === "container" && args[1] === "inspect") {
+      return super.run(executable, args);
+    }
+    this.calls.push({ executable, args });
+    this.agentEnvironment = options?.env;
+    return {
+      stdout: `${JSON.stringify({
+        event: "task_completed",
+        threadId: "thread-1",
+        turnId: "turn-1",
+        message: "done",
+      })}\n`,
+      stderr: "",
+    };
+  }
+}
+
 const workspace: Workspace = {
   id: randomUUID(),
   ownerUserId: randomUUID(),
@@ -142,5 +167,40 @@ describe("DockerSandboxSupervisor", () => {
     );
     expect(runner.calls).toHaveLength(1);
     expect(runner.calls[0]?.args.slice(0, 2)).toEqual(["container", "inspect"]);
+  });
+
+  it("passes identity only through the Agent Runner environment", async () => {
+    const runner = new AgentTaskRunner();
+    const supervisor = new DockerSandboxSupervisor(
+      loadRuntimeConfig({
+        RAD_DATABASE_URL: "postgresql://rad:rad@db/rad",
+        RAD_WORKSPACE_IMAGE: "rad/workspace:local",
+        RAD_CODEX_API_KEY: "super-secret",
+      }),
+      runner,
+      async () => repository,
+    );
+
+    await expect(supervisor.runTask(workspace, "test task")).resolves.toEqual({
+      threadId: "thread-1",
+      turnId: "turn-1",
+      message: "done",
+    });
+    const agentCall = runner.calls[1];
+    expect(agentCall?.args.slice(0, 2)).toEqual(["container", "run"]);
+    expect(agentCall?.args.join(" ")).not.toContain("super-secret");
+    expect(runner.agentEnvironment?.OPENAI_API_KEY).toBe("super-secret");
+
+    const encodedPayload = agentCall?.args.at(-1);
+    expect(encodedPayload).toBeDefined();
+    const payload = JSON.parse(
+      Buffer.from(encodedPayload ?? "", "base64url").toString("utf8"),
+    ) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      task: "test task",
+      cwd: "/workspace/repository",
+      environmentId: workspace.id,
+      execServerUrl: "ws://127.0.0.1:4500",
+    });
   });
 });
