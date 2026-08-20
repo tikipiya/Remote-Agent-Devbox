@@ -36,6 +36,7 @@ export const runtimeConfigSchema = z
     RAD_VALIDATOR_CPUS: z.coerce.number().positive().max(4).default(1),
     RAD_VALIDATOR_PIDS: positiveInteger.min(16).max(512).default(64),
     RAD_VALIDATOR_TIMEOUT_MS: positiveInteger.min(1_000).max(600_000).default(120_000),
+    RAD_APPROVAL_TTL_SECONDS: positiveInteger.min(60).max(86_400).default(3_600),
     RAD_CODEX_API_KEY: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_TOKEN: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_APPLICATION_ID: z.string().min(1).optional().or(z.literal("")),

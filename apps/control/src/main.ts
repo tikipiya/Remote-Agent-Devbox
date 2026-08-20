@@ -1,5 +1,6 @@
 import { loadRuntimeConfig } from "@rad/shared";
 import { PostgresAgentTaskRepository } from "@rad/agents";
+import { PostgresApprovalRepository } from "@rad/approvals";
 import {
   PostgresGitArtifactRepository,
   PostgresReviewSnapshotRepository,
@@ -21,6 +22,7 @@ import { ArtifactService } from "./artifacts/artifact-service.js";
 import { ArtifactStore } from "./artifacts/artifact-store.js";
 import { DockerValidatorLauncher } from "./validation/docker-validator.js";
 import { ReviewService } from "./validation/review-service.js";
+import { ApprovalService } from "./approvals/approval-service.js";
 
 const config = loadRuntimeConfig();
 const { db, pool } = createDatabase(config.RAD_DATABASE_URL);
@@ -46,6 +48,7 @@ await repository.synchronizeSecurityMetadata({
     validatorCpus: config.RAD_VALIDATOR_CPUS,
     validatorPids: config.RAD_VALIDATOR_PIDS,
     validatorTimeoutMilliseconds: config.RAD_VALIDATOR_TIMEOUT_MS,
+    approvalTtlSeconds: config.RAD_APPROVAL_TTL_SECONDS,
   }),
 });
 const commandRunner = new ExecFileCommandRunner();
@@ -66,18 +69,26 @@ const artifactStore = new ArtifactStore(
   config.RAD_ARTIFACT_MAX_BYTES,
 );
 await artifactStore.initialize();
+const artifactRepository = new PostgresGitArtifactRepository(db);
+const reviewRepository = new PostgresReviewSnapshotRepository(db);
 const artifactService = new ArtifactService(
-  new PostgresGitArtifactRepository(db),
+  artifactRepository,
   repository,
   supervisor,
   artifactStore,
 );
 const reviewService = new ReviewService(
-  new PostgresGitArtifactRepository(db),
-  new PostgresReviewSnapshotRepository(db),
+  artifactRepository,
+  reviewRepository,
   repository,
   repository,
   new DockerValidatorLauncher(config, commandRunner),
+);
+const approvalService = new ApprovalService(
+  new PostgresApprovalRepository(db),
+  reviewRepository,
+  repository,
+  config.RAD_APPROVAL_TTL_SECONDS,
 );
 const server = createControlServer({
   config,
@@ -88,6 +99,7 @@ const server = createControlServer({
   taskService,
   artifactService,
   reviewService,
+  approvalService,
 });
 
 const reconcileTimer = setInterval(() => {

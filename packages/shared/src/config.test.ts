@@ -17,6 +17,7 @@ describe("loadRuntimeConfig", () => {
     expect(config.RAD_ARTIFACT_MAX_BYTES).toBe(64 * 1024 * 1024);
     expect(config.RAD_ARTIFACT_VOLUME).toBe("rad-artifacts");
     expect(config.RAD_VALIDATOR_IMAGE_DIGEST).toBeUndefined();
+    expect(config.RAD_APPROVAL_TTL_SECONDS).toBe(3_600);
   });
 
   it("rejects non-canonical validator image digests", () => {

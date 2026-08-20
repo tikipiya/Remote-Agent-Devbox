@@ -45,6 +45,22 @@ export interface ReviewSnapshot {
   };
 }
 
+export interface ApprovalRequest {
+  id: string;
+  reviewSnapshotId: string;
+  operationType: "CREATE_PULL_REQUEST";
+  reviewDigest: string;
+  validatorProfileDigest: string;
+  securityEpoch: number;
+  status: "PENDING" | "APPROVED" | "DENIED" | "STALE";
+  staleReason: string | null;
+  requestedBy: string;
+  requestedAt: string;
+  expiresAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -100,3 +116,22 @@ export const captureArtifact = (workspaceId: string): Promise<GitArtifact> =>
 
 export const validateArtifact = (artifactId: string): Promise<ReviewSnapshot> =>
   request(`/api/artifacts/${artifactId}/validate`, { method: "POST" });
+
+export const requestApproval = (
+  reviewSnapshotId: string,
+  requestedBy: string,
+): Promise<ApprovalRequest> =>
+  request(`/api/reviews/${reviewSnapshotId}/approvals`, {
+    method: "POST",
+    body: JSON.stringify({ requestedBy }),
+  });
+
+export const decideApproval = (
+  approvalId: string,
+  decision: "APPROVE" | "DENY",
+  decidedBy: string,
+): Promise<ApprovalRequest> =>
+  request(`/api/approvals/${approvalId}/decision`, {
+    method: "POST",
+    body: JSON.stringify({ decision, decidedBy }),
+  });

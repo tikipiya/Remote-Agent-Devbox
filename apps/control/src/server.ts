@@ -22,6 +22,7 @@ import type { DockerSandboxSupervisor } from "./workspace/docker-supervisor.js";
 import type { TaskService } from "./tasks/task-service.js";
 import type { ArtifactService } from "./artifacts/artifact-service.js";
 import type { ReviewService } from "./validation/review-service.js";
+import type { ApprovalService } from "./approvals/approval-service.js";
 
 export interface ControlServices {
   config: RuntimeConfig;
@@ -32,6 +33,7 @@ export interface ControlServices {
   taskService: Pick<TaskService, "run" | "get">;
   artifactService: Pick<ArtifactService, "capture" | "get">;
   reviewService: Pick<ReviewService, "validateArtifact" | "get">;
+  approvalService: Pick<ApprovalService, "request" | "get" | "approve" | "deny">;
 }
 
 const repositoryBodySchema = z.object({
@@ -52,6 +54,10 @@ const taskBodySchema = z.object({
   requestedBy: z.string().min(1).max(255),
 });
 const idParamsSchema = z.object({ id: z.uuid() });
+const approvalRequestBodySchema = z.object({ requestedBy: z.uuid() }).strict();
+const approvalDecisionBodySchema = z
+  .object({ decision: z.enum(["APPROVE", "DENY"]), decidedBy: z.uuid() })
+  .strict();
 
 export function createControlServer(services: ControlServices): FastifyInstance {
   const server = Fastify({
@@ -167,6 +173,30 @@ export function createControlServer(services: ControlServices): FastifyInstance 
       throw new RadError("REVIEW_NOT_FOUND", `Review ${id} not found`);
     }
     return review;
+  });
+
+  server.post("/api/reviews/:id/approvals", async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const { requestedBy } = approvalRequestBodySchema.parse(request.body);
+    const approval = await services.approvalService.request(id, requestedBy);
+    return reply.status(201).send(approval);
+  });
+
+  server.get("/api/approvals/:id", async (request) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const approval = await services.approvalService.get(id);
+    if (!approval) {
+      throw new RadError("APPROVAL_NOT_FOUND", `Approval ${id} not found`);
+    }
+    return approval;
+  });
+
+  server.post("/api/approvals/:id/decision", async (request) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const input = approvalDecisionBodySchema.parse(request.body);
+    return input.decision === "APPROVE"
+      ? services.approvalService.approve(id, input.decidedBy)
+      : services.approvalService.deny(id, input.decidedBy);
   });
 
   return server;
