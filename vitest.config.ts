@@ -20,6 +20,9 @@ export default defineConfig({
       "@rad/audit-events": fileURLToPath(
         new URL("./packages/audit-events/src/index.ts", import.meta.url),
       ),
+      "@rad/outbox": fileURLToPath(
+        new URL("./packages/outbox/src/index.ts", import.meta.url),
+      ),
     },
   },
   test: {

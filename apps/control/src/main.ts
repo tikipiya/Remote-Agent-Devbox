@@ -1,5 +1,6 @@
 import { loadRuntimeConfig } from "@rad/shared";
 import { PostgresAgentTaskRepository } from "@rad/agents";
+import { OutboxDispatcher, PostgresOutboxRepository } from "@rad/outbox";
 import { PostgresApprovalRepository } from "@rad/approvals";
 import {
   PostgresCredentialLeaseRepository,
@@ -12,7 +13,6 @@ import {
 } from "@rad/git-artifacts";
 import {
   PostgresWorkspaceRepository,
-  WorkspaceCoordinator,
   WorkspaceReconciler,
   createDatabase,
 } from "@rad/workspace-state";
@@ -35,6 +35,10 @@ import { TrustedGitWriter } from "./git/git-writer.js";
 import { GitHubPullRequestCreator } from "./git/github-pull-request.js";
 import { MaintenanceModeGuard } from "./security/maintenance-guard.js";
 import { buildSecurityPostureHash } from "./security/security-posture.js";
+import {
+  OutboxWorkspaceCoordinator,
+  WorkspaceOutboxHandler,
+} from "./workspace/outbox-coordinator.js";
 
 const config = loadRuntimeConfig();
 const { db, pool } = createDatabase(config.RAD_DATABASE_URL);
@@ -51,7 +55,20 @@ const supervisor = new DockerSandboxSupervisor(
   async (id) => repository.getRepository(id),
 );
 const reconciler = new WorkspaceReconciler(repository, supervisor);
-const coordinator = new WorkspaceCoordinator(repository, reconciler);
+const outboxRepository = new PostgresOutboxRepository(db);
+await outboxRepository.recoverStale(
+  new Date(Date.now() - Math.max(30_000, config.RAD_RECONCILE_INTERVAL_MS * 2)),
+  new Date(),
+);
+const outboxDispatcher = new OutboxDispatcher(
+  outboxRepository,
+  new WorkspaceOutboxHandler(reconciler),
+);
+const coordinator = new OutboxWorkspaceCoordinator(
+  outboxRepository,
+  outboxDispatcher,
+  repository,
+);
 const taskService = new TaskService(
   new PostgresAgentTaskRepository(db),
   repository,
@@ -126,6 +143,7 @@ const server = createControlServer({
 });
 
 const reconcileTimer = setInterval(() => {
+  void outboxDispatcher.dispatchAvailable();
   void reconciler.reconcileAll();
 }, config.RAD_RECONCILE_INTERVAL_MS);
 reconcileTimer.unref();
