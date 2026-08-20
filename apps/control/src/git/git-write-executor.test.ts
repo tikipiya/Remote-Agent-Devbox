@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { ApprovalRequest } from "@rad/approvals";
@@ -198,7 +200,7 @@ function createExecutor(
         throw new Error("not used");
       },
     },
-    new ArtifactStore("C:\\rad-test", 100),
+    new ArtifactStore(resolve("rad-test"), 100),
     () => now,
   );
 }
