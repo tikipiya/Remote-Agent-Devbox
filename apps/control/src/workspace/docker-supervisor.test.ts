@@ -64,6 +64,28 @@ class AgentTaskRunner extends HealthyWorkspaceRunner {
   }
 }
 
+class GitBundleRunner extends RecordingRunner {
+  public override async run(
+    executable: string,
+    args: readonly string[],
+  ): Promise<CommandResult> {
+    this.calls.push({ executable, args });
+    if (args[0] === "container" && args[1] === "inspect") {
+      return {
+        stdout: JSON.stringify({ Running: true, Health: { Status: "healthy" } }),
+        stderr: "",
+      };
+    }
+    if (args.includes("symbolic-ref")) {
+      return { stdout: `${workspace.branchName}\n`, stderr: "" };
+    }
+    if (args.includes("--format=%s")) {
+      return { stdout: "4096\n", stderr: "" };
+    }
+    return { stdout: "", stderr: "" };
+  }
+}
+
 const workspace: Workspace = {
   id: randomUUID(),
   ownerUserId: randomUUID(),
@@ -202,5 +224,30 @@ describe("DockerSandboxSupervisor", () => {
       environmentId: workspace.id,
       execServerUrl: "ws://127.0.0.1:4500",
     });
+  });
+
+  it("exports a committed Git bundle without trusting Workspace metadata", async () => {
+    const runner = new GitBundleRunner();
+    const supervisor = new DockerSandboxSupervisor(
+      loadRuntimeConfig({
+        RAD_DATABASE_URL: "postgresql://rad:rad@db/rad",
+        RAD_WORKSPACE_IMAGE: "rad/workspace:local",
+      }),
+      runner,
+      async () => repository,
+    );
+
+    await supervisor.exportGitBundle(workspace, repository, "/trusted/staging.bundle");
+
+    expect(runner.calls.some((call) => call.args.includes("symbolic-ref"))).toBe(true);
+    expect(runner.calls.some((call) => call.args.includes("--porcelain=v1"))).toBe(true);
+    const bundleCall = runner.calls.find((call) => call.args.includes("bundle"));
+    expect(bundleCall?.args).toContain("HEAD");
+    expect(bundleCall?.args).toContain("refs/remotes/origin/main");
+    const copyCall = runner.calls.find(
+      (call) => call.args[0] === "container" && call.args[1] === "cp",
+    );
+    expect(copyCall?.args.at(-1)).toBe("/trusted/staging.bundle");
+    expect(runner.calls.at(-1)?.args).toContain("/bin/rm");
   });
 });

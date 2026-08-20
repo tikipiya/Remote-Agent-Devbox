@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { randomUUID } from "node:crypto";
 
 import {
   RadError,
@@ -163,6 +164,109 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
     };
   }
 
+  public async exportGitBundle(
+    workspace: Workspace,
+    repository: Repository,
+    destinationPath: string,
+  ): Promise<void> {
+    if ((await this.inspect(workspace)) !== "RUNNING") {
+      throw new RadError("WORKSPACE_NOT_READY", `Workspace ${workspace.id} is not running`);
+    }
+    const workspacePath = `/tmp/rad-artifact-${randomUUID()}.bundle`;
+    const git = [
+      "container",
+      "exec",
+      "--user",
+      "10001:10001",
+      "--workdir",
+      "/workspace/repository",
+      containerName(workspace.id),
+      "git",
+      "-c",
+      "core.hooksPath=/dev/null",
+    ];
+
+    try {
+      const branch = await this.docker([...git, "symbolic-ref", "--short", "HEAD"]);
+      if (branch.stdout.trim() !== workspace.branchName) {
+        throw new RadError(
+          "ARTIFACT_BRANCH_MISMATCH",
+          `Workspace branch is not ${workspace.branchName}`,
+        );
+      }
+      const status = await this.docker([
+        ...git,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+      ]);
+      if (status.stdout.trim() !== "") {
+        throw new RadError(
+          "ARTIFACT_WORKTREE_DIRTY",
+          "Commit or discard Workspace changes before creating an artifact",
+        );
+      }
+
+      await this.docker(
+        [
+          ...git,
+          "bundle",
+          "create",
+          workspacePath,
+          "HEAD",
+          `refs/remotes/origin/${repository.defaultBranch}`,
+        ],
+        { timeoutMs: 120_000 },
+      );
+      const sizeResult = await this.docker([
+        "container",
+        "exec",
+        "--user",
+        "10001:10001",
+        containerName(workspace.id),
+        "/usr/bin/stat",
+        "--format=%s",
+        workspacePath,
+      ]);
+      const size = Number(sizeResult.stdout.trim());
+      if (
+        !Number.isSafeInteger(size) ||
+        size <= 0 ||
+        size > this.config.RAD_ARTIFACT_MAX_BYTES
+      ) {
+        throw new RadError(
+          "ARTIFACT_SIZE_INVALID",
+          `Workspace artifact size ${sizeResult.stdout.trim()} is outside the configured limit`,
+        );
+      }
+      await this.docker(
+        [
+          "container",
+          "cp",
+          `${containerName(workspace.id)}:${workspacePath}`,
+          destinationPath,
+        ],
+        { timeoutMs: 120_000 },
+      );
+    } finally {
+      try {
+        await this.docker([
+          "container",
+          "exec",
+          "--user",
+          "10001:10001",
+          containerName(workspace.id),
+          "/bin/rm",
+          "--force",
+          "--",
+          workspacePath,
+        ]);
+      } catch {
+        // The Workspace is untrusted and temporary. Stale tmpfs bytes carry no authority.
+      }
+    }
+  }
+
   public createAgentRunnerArguments(
     workspace: Workspace,
     payload: string,
@@ -252,8 +356,11 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
     ];
   }
 
-  private docker(args: readonly string[]): Promise<{ stdout: string; stderr: string }> {
-    return this.commandRunner.run("docker", args);
+  private docker(
+    args: readonly string[],
+    options?: { timeoutMs?: number; env?: NodeJS.ProcessEnv },
+  ): Promise<{ stdout: string; stderr: string }> {
+    return this.commandRunner.run("docker", args, options);
   }
 
   private async waitUntilHealthy(workspace: Workspace): Promise<void> {

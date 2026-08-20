@@ -112,6 +112,11 @@ export class ArtifactStore {
     return readFile(this.resolve(storageKey));
   }
 
+  public async discardStaging(path: string): Promise<void> {
+    this.requireStagingPath(path);
+    await rm(path, { force: true });
+  }
+
   private requireStagingPath(path: string): void {
     const resolvedPath = resolve(path);
     if (!resolvedPath.startsWith(`${this.stagingRoot}${sep}`)) {
