@@ -31,3 +31,9 @@ docker compose up
 
 The HTTP service listens on `127.0.0.1:3000` by default. Discord support is
 disabled unless both Discord environment variables are supplied.
+
+## Documentation
+
+- [Milestone 0 architecture](./docs/architecture/MILESTONE_0.md)
+- [Security Gate A](./docs/security/SECURITY_GATE_A.md)
+- [Operations](./docs/OPERATIONS.md)
