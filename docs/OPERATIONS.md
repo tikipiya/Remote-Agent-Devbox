@@ -3,7 +3,8 @@
 ## Local Tier 1 startup
 
 1. Install Node.js 22.15+, Rootless Docker, and Docker Compose.
-2. Copy `.env.example` to `.env` and replace the PostgreSQL password.
+2. Copy `.env.example` to `.env`, replace the PostgreSQL password, and set a
+   dedicated OpenAI project key as `RAD_CODEX_API_KEY`.
 3. Keep Discord variables empty unless a bot application is ready.
 4. Build and start:
 
@@ -15,6 +16,19 @@ docker compose up -d
 ```
 
 Open `http://127.0.0.1:3000`.
+
+## Codex identity
+
+The key remains in the Tier 1 control process and is forwarded only to a
+short-lived trusted Agent Runner. It is not placed in the Workspace environment
+or mounted filesystem. Do not use a personal shell's `CODEX_HOME` or a broadly
+privileged organization key.
+
+Verify the real App Server to Exec Server protocol without making a model call:
+
+```bash
+npm run verify:codex-boundary
+```
 
 ## Rootless Docker socket
 
@@ -47,4 +61,3 @@ docker compose down
 
 Add `--volumes` only when intentionally deleting PostgreSQL state. Workspace
 volumes are removed by the lifecycle destroy operation.
-

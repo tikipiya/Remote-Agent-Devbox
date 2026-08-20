@@ -36,6 +36,7 @@ COPY --from=build /opt/rad/packages/agents/dist ./packages/agents/dist
 COPY --from=build /opt/rad/packages/shared/dist ./packages/shared/dist
 COPY --from=build /opt/rad/node_modules ./node_modules
 COPY --chown=root:root images/workspace-node/entrypoint.sh /usr/local/bin/rad-workspace-entrypoint
+COPY --chown=root:root scripts/verify-codex-exec-boundary.mjs ./scripts/verify-codex-exec-boundary.mjs
 RUN chmod 0555 /usr/local/bin/rad-workspace-entrypoint
 
 USER 10001:10001

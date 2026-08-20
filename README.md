@@ -11,6 +11,7 @@ and the Milestone 0 workspace vertical slice.
 
 - Workspaces are untrusted.
 - No Docker socket or GitHub write credential is mounted into a workspace.
+- Codex model identity is held by a separate short-lived Agent Runner.
 - Workspace and control-plane networks are separate.
 - Resource limits are mandatory and configuration fails closed.
 - Desired and observed workspace states are stored independently.
@@ -20,6 +21,9 @@ See [SECURITY.md](./SECURITY.md) for the trust boundary and deployment claims.
 ## Development
 
 Requirements: Node.js 22+, Docker with Compose, and PostgreSQL 16+.
+
+Set `RAD_CODEX_API_KEY` in `.env` to run agent tasks. The key should belong to a
+dedicated OpenAI project; it is never forwarded to a Workspace.
 
 ```bash
 cp .env.example .env
@@ -35,5 +39,6 @@ disabled unless both Discord environment variables are supplied.
 ## Documentation
 
 - [Milestone 0 architecture](./docs/architecture/MILESTONE_0.md)
+- [Codex identity boundary](./docs/architecture/CODEX_IDENTITY_BOUNDARY.md)
 - [Security Gate A](./docs/security/SECURITY_GATE_A.md)
 - [Operations](./docs/OPERATIONS.md)

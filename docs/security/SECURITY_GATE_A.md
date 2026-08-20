@@ -15,13 +15,17 @@
   and workspace ID.
 - No Docker socket, GitHub token, SSH agent, credential helper, or proxy
   credential is present in a Workspace.
+- OpenAI model identity exists only in a short-lived, read-only Agent Runner
+  with no Workspace volume. Commands execute through the credential-free Codex
+  Exec Server in the Workspace.
 
 ## Automated negative tests
 
 `security/gate-a/security-gate-a.test.ts` and the Docker Supervisor tests fail
 if isolation-sensitive configuration regresses. They check network membership,
 non-root execution, resource flags, read-only root configuration, loopback IDE
-publication, and the absence of Docker/GitHub credential mounts.
+publication, the absence of Docker/GitHub credential mounts, and separation of
+the Codex App Server identity from the Workspace Exec Server.
 
 ## Trusted boundary
 
@@ -44,4 +48,3 @@ docker network inspect rad-workspace
 
 Confirm that the Workspace cannot resolve or connect to the database or
 control container and that the limits match the configured values.
-

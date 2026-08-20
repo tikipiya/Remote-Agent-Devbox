@@ -42,6 +42,11 @@ jobs:
         with:
           context: .
           file: images/workspace-node/Dockerfile
+          load: true
           push: false
           tags: remote-agent-devbox-workspace-node:ci
-
+      - name: Verify Codex identity boundary
+        run: >-
+          docker run --rm --entrypoint node
+          remote-agent-devbox-workspace-node:ci
+          /opt/rad/scripts/verify-codex-exec-boundary.mjs

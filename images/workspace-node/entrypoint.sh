@@ -3,6 +3,7 @@ set -eu
 
 umask 077
 unset GIT_ASKPASS SSH_ASKPASS SSH_AUTH_SOCK GITHUB_TOKEN GH_TOKEN
+unset OPENAI_API_KEY CODEX_ACCESS_TOKEN
 unset HTTP_PROXY HTTPS_PROXY ALL_PROXY http_proxy https_proxy all_proxy
 
 if [ ! -d /workspace/repository/.git ]; then
