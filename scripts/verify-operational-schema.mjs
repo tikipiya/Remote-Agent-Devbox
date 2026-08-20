@@ -17,6 +17,7 @@ const migrations = [
   "packages/workspace-state/migrations/0002_operational_posture.sql",
   "packages/audit-events/migrations/0001_audit_events.sql",
   "packages/outbox/migrations/0001_outbox_commands.sql",
+  "packages/ide-access/migrations/0001_ide_access.sql",
 ];
 
 try {
@@ -43,9 +44,20 @@ try {
   const tableCount = await psql(`
     SELECT COUNT(*) FROM information_schema.tables
     WHERE table_schema = 'public'
-      AND table_name IN ('instance_metadata', 'audit_events', 'outbox_commands')
+      AND table_name IN (
+        'instance_metadata', 'audit_events', 'outbox_commands',
+        'ide_access_codes', 'ide_access_sessions'
+      )
   `);
-  if (tableCount !== "3") throw new Error("operational schema tables are incomplete");
+  if (tableCount !== "5") throw new Error("operational schema tables are incomplete");
+
+  const ideSecretColumnCount = await psql(`
+    SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name IN ('ide_access_codes', 'ide_access_sessions')
+      AND column_name IN ('code_digest', 'session_digest')
+  `);
+  if (ideSecretColumnCount !== "2") throw new Error("IDE access digest columns are incomplete");
 
   const postureColumnCount = await psql(`
     SELECT COUNT(*) FROM information_schema.columns

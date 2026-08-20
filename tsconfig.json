@@ -10,6 +10,7 @@
     { "path": "./packages/github-token-issuer" },
     { "path": "./packages/audit-events" },
     { "path": "./packages/outbox" },
+    { "path": "./packages/ide-access" },
     { "path": "./apps/control" },
     { "path": "./apps/agent-worker" },
     { "path": "./apps/validator" },
