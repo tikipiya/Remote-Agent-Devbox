@@ -1,5 +1,7 @@
 # Milestone 3 - Operational Security Posture
 
+[日本語版](../ja/architecture/MILESTONE_3.md)
+
 ## Status
 
 Milestone 3 implements the Fourth Vertical Slice and automated Security Gate D

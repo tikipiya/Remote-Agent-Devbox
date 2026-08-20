@@ -1,5 +1,7 @@
 # Operations
 
+[日本語版](./ja/OPERATIONS.md)
+
 ## Local Tier 1 startup
 
 1. Install Node.js 22.15+, Rootless Docker Engine 26+, and Docker Compose.

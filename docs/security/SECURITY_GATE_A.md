@@ -1,5 +1,7 @@
 # Security Gate A — Workspace Isolation
 
+[日本語版](../ja/security/SECURITY_GATE_A.md)
+
 ## Enforced properties
 
 - Workspace processes run as UID/GID `10001`.

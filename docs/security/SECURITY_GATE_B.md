@@ -1,5 +1,7 @@
 # Security Gate B - Artifact Integrity
 
+[日本語版](../ja/security/SECURITY_GATE_B.md)
+
 ## Enforced properties
 
 - Artifact SHA-256 is computed by trusted server code, never accepted from a

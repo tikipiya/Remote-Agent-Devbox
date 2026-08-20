@@ -1,5 +1,7 @@
 # Milestone 1 - Immutable Review Pipeline
 
+[日本語版](../ja/architecture/MILESTONE_1.md)
+
 ## Status
 
 Milestone 1 implements the Tier 1 Git Artifact, networkless structural
