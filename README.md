@@ -5,7 +5,7 @@ isolated, disposable workspaces. The v0.9 architecture in [PLAN.md](./PLAN.md)
 is the source of truth.
 
 The current implementation targets **Tier 1 — Secure Personal / Small Team**
-and includes the Milestone 2 approved Git write pipeline.
+and includes the Milestone 3 operational security posture pipeline.
 
 ## Security model
 
@@ -22,6 +22,10 @@ and includes the Milestone 2 approved Git write pipeline.
   security epoch.
 - Final revalidation, a one-use credential lease, and remote compare-and-swap
   restrict writes to the Workspace's dedicated agent branch.
+- Silent security posture changes are blocked; explicit migrations use
+  maintenance mode, monotonic epochs, state invalidation, and append-only audit.
+- A secret-free transactional outbox durably delivers Workspace state intent
+  to the idempotent reconciler.
 
 See [SECURITY.md](./SECURITY.md) for the trust boundary and deployment claims.
 
@@ -55,8 +59,11 @@ disabled unless both Discord environment variables are supplied.
 - [Milestone 0 architecture](./docs/architecture/MILESTONE_0.md)
 - [Milestone 1 immutable review pipeline](./docs/architecture/MILESTONE_1.md)
 - [Milestone 2 approved Git write pipeline](./docs/architecture/MILESTONE_2.md)
+- [Milestone 3 operational security posture](./docs/architecture/MILESTONE_3.md)
+- [Deployment tiers](./docs/DEPLOYMENT_TIERS.md)
 - [Codex identity boundary](./docs/architecture/CODEX_IDENTITY_BOUNDARY.md)
 - [Security Gate A](./docs/security/SECURITY_GATE_A.md)
 - [Security Gate B](./docs/security/SECURITY_GATE_B.md)
 - [Security Gate C](./docs/security/SECURITY_GATE_C.md)
+- [Security Gate D](./docs/security/SECURITY_GATE_D.md)
 - [Operations](./docs/OPERATIONS.md)

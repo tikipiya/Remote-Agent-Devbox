@@ -76,6 +76,85 @@ Before claiming Security Gate C for a deployment, create an immutable Review
 Snapshot, approve it, and complete one real pull request using that deployment's
 GitHub App installation. Do not reuse production credentials for CI.
 
+## Existing database migrations
+
+PostgreSQL init files run automatically only for an empty data directory. Back
+up an existing database and apply these Milestone 3 files in order before
+starting the new control image:
+
+```text
+007_operational_posture.sql
+008_audit_events.sql
+009_outbox_commands.sql
+```
+
+The source files and Compose mappings are:
+
+```text
+packages/workspace-state/migrations/0002_operational_posture.sql
+packages/audit-events/migrations/0001_audit_events.sql
+packages/outbox/migrations/0001_outbox_commands.sql
+```
+
+Run them using the database owner configured for `rad-control`. Do not edit
+`instance_metadata` directly.
+
+## Explicit security posture migration
+
+Changing a security-sensitive `.env` value makes normal startup fail closed
+until the stored posture is explicitly migrated. First stop `control`, deploy
+the new configuration/image, and inspect the current stored tier and epoch:
+
+```bash
+docker compose stop control
+docker compose exec database psql -U rad -d rad -c \
+  "SELECT deployment_tier, security_epoch, maintenance_mode FROM instance_metadata"
+```
+
+Run the admin command with a stable operator UUID, a non-secret reason, and the
+exact confirmation derived from the query. This example migrates epoch 42 at
+Tier 1 to the configured Tier 1 posture:
+
+```bash
+docker compose run --rm control \
+  node apps/control/dist/admin.js security-migrate \
+  --actor 10000000-0000-4000-8000-000000000001 \
+  --reason "validator image rotation" \
+  --confirm "MIGRATE EPOCH 42 TIER 1->1"
+```
+
+The command enters maintenance before invalidation. If a Git operation is
+`PUSHING` or another check is ambiguous, it fails and intentionally leaves
+maintenance active. Inspect the remote result and audit log, then retry using
+the same reason after resolving the blocker. A different concurrent
+maintenance reason is rejected.
+
+After success, start `control` and verify `/health` reports `ok` with the new
+epoch. Old approvals must be stale and active Workspaces must converge to
+`STOPPED` before an operator restarts them.
+
+## Backup and restore
+
+Back up PostgreSQL plus the artifact volume as one recovery point. GitHub token
+bytes are not stored and therefore are not part of a backup.
+
+After restoring PostgreSQL, do not expose the control service. Run the explicit
+migration command with `--rotate-epoch`, even when tier and posture hash are
+unchanged:
+
+```bash
+docker compose run --rm control \
+  node apps/control/dist/admin.js security-migrate \
+  --actor 10000000-0000-4000-8000-000000000001 \
+  --reason "post-restore epoch rotation" \
+  --confirm "MIGRATE EPOCH 42 TIER 1->1" \
+  --rotate-epoch
+```
+
+Then reconcile Workspaces, inspect `GET /api/audit-events`, and only resume
+service after the new epoch is visible. This prevents restored approvals from
+being replayed under the old security context.
+
 ## Codex identity
 
 The key remains in the Tier 1 control process and is forwarded only to a
@@ -116,6 +195,11 @@ The token remains in `rad-control`. It is not forwarded to a Workspace.
 The reconciler runs every `RAD_RECONCILE_INTERVAL_MS`. A failed operation keeps
 the requested desired state and records `observed_state = FAILED`, allowing a
 later reconciliation attempt to converge after the runtime problem is fixed.
+
+Workspace desired-state changes also create a secret-free outbox command in
+the same database transaction. The dispatcher retries boundedly and recovers
+stale processing claims after restart; the reconciler remains responsible for
+eventual state convergence.
 
 Destroying a Workspace removes both its container and its data volume. This is
 intentional and not recoverable unless the repository contains committed work.

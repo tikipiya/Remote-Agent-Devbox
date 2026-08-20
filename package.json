@@ -23,7 +23,8 @@
     "verify:codex-boundary": "npm run build && node scripts/verify-codex-exec-boundary.mjs",
     "verify:codex-task": "npm run build && node scripts/verify-codex-exec-boundary.mjs --model-task",
     "verify:validator": "node scripts/verify-validator-boundary.mjs",
-    "verify:git-cas": "node scripts/verify-git-cas-boundary.mjs"
+    "verify:git-cas": "node scripts/verify-git-cas-boundary.mjs",
+    "verify:operational-schema": "node scripts/verify-operational-schema.mjs"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
