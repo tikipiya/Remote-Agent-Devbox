@@ -24,6 +24,7 @@ services:
       - ./packages/approvals/migrations/0001_approval_requests.sql:/docker-entrypoint-initdb.d/005_approval_requests.sql:ro
       - ./packages/git-operations/migrations/0001_git_operations.sql:/docker-entrypoint-initdb.d/006_git_operations.sql:ro
       - ./packages/workspace-state/migrations/0002_operational_posture.sql:/docker-entrypoint-initdb.d/007_operational_posture.sql:ro
+      - ./packages/audit-events/migrations/0001_audit_events.sql:/docker-entrypoint-initdb.d/008_audit_events.sql:ro
     security_opt:
       - no-new-privileges:true
 
