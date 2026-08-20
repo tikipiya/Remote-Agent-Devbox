@@ -40,6 +40,10 @@ function testServices(): ControlServices {
       capture: unavailable,
       get: unavailable,
     },
+    reviewService: {
+      validateArtifact: unavailable,
+      get: unavailable,
+    },
   };
 }
 

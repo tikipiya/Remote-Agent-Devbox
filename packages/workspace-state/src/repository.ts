@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
@@ -10,7 +10,7 @@ import {
   type Workspace,
 } from "@rad/shared";
 
-import { repositories, workspaces } from "./schema.js";
+import { instanceMetadata, repositories, workspaces } from "./schema.js";
 
 export interface NewRepository {
   id: string;
@@ -46,6 +46,21 @@ export interface WorkspaceRepository {
   ): Promise<Workspace>;
 }
 
+export interface InstanceSecurityMetadata {
+  deploymentTier: number;
+  securityEpoch: number;
+  securityPostureHash: string;
+  updatedAt: Date;
+}
+
+export interface InstanceMetadataRepository {
+  synchronizeSecurityMetadata(input: {
+    deploymentTier: number;
+    securityPostureHash: string;
+  }): Promise<InstanceSecurityMetadata>;
+  getSecurityMetadata(): Promise<InstanceSecurityMetadata | undefined>;
+}
+
 export function createDatabase(databaseUrl: string): {
   db: NodePgDatabase;
   pool: Pool;
@@ -54,7 +69,7 @@ export function createDatabase(databaseUrl: string): {
   return { db: drizzle(pool), pool };
 }
 
-export class PostgresWorkspaceRepository implements WorkspaceRepository {
+export class PostgresWorkspaceRepository implements WorkspaceRepository, InstanceMetadataRepository {
   public constructor(private readonly db: NodePgDatabase) {}
 
   public async createRepository(input: NewRepository): Promise<Repository> {
@@ -63,6 +78,45 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
       .values(input)
       .returning();
     return requireRecord(record, "REPOSITORY_CREATE_FAILED");
+  }
+
+  public async synchronizeSecurityMetadata(input: {
+    deploymentTier: number;
+    securityPostureHash: string;
+  }): Promise<InstanceSecurityMetadata> {
+    const [record] = await this.db
+      .insert(instanceMetadata)
+      .values({ singletonKey: "instance", securityEpoch: 1, ...input })
+      .onConflictDoUpdate({
+        target: instanceMetadata.singletonKey,
+        set: {
+          securityEpoch: sql`CASE
+            WHEN ${instanceMetadata.deploymentTier} <> ${input.deploymentTier}
+              OR ${instanceMetadata.securityPostureHash} <> ${input.securityPostureHash}
+            THEN ${instanceMetadata.securityEpoch} + 1
+            ELSE ${instanceMetadata.securityEpoch}
+          END`,
+          deploymentTier: input.deploymentTier,
+          securityPostureHash: input.securityPostureHash,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return requireRecord(record, "INSTANCE_METADATA_SYNC_FAILED");
+  }
+
+  public async getSecurityMetadata(): Promise<InstanceSecurityMetadata | undefined> {
+    const [record] = await this.db
+      .select({
+        deploymentTier: instanceMetadata.deploymentTier,
+        securityEpoch: instanceMetadata.securityEpoch,
+        securityPostureHash: instanceMetadata.securityPostureHash,
+        updatedAt: instanceMetadata.updatedAt,
+      })
+      .from(instanceMetadata)
+      .where(eq(instanceMetadata.singletonKey, "instance"))
+      .limit(1);
+    return record;
   }
 
   public async getRepository(id: string): Promise<Repository | undefined> {

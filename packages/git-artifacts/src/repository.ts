@@ -4,6 +4,7 @@ import {
   bigint,
   check,
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -20,6 +21,14 @@ import {
   type GitArtifactStatus,
   type Sha256Digest,
 } from "./artifact.js";
+import {
+  digestCanonical,
+  reviewManifestSchema,
+  validatorProfileSchema,
+  type ReviewManifest,
+  type ValidatorProfile,
+} from "./crf.js";
+import type { ReviewSnapshot } from "./review.js";
 
 export const gitArtifacts = pgTable(
   "git_artifacts",
@@ -46,6 +55,40 @@ export const gitArtifacts = pgTable(
   ],
 );
 
+export const reviewSnapshots = pgTable(
+  "review_snapshots",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id").notNull(),
+    repositoryId: uuid("repository_id").notNull(),
+    artifactId: uuid("artifact_id").notNull().unique(),
+    crfVersion: text("crf_version").notNull(),
+    baseCommit: text("base_commit").notNull(),
+    targetCommit: text("target_commit").notNull(),
+    targetTree: text("target_tree").notNull(),
+    artifactDigest: text("artifact_digest").notNull(),
+    validatorProfileDigest: text("validator_profile_digest").notNull(),
+    validatorProfile: jsonb("validator_profile").$type<ValidatorProfile>().notNull(),
+    securityEpoch: bigint("security_epoch", { mode: "number" }).notNull(),
+    deploymentTier: bigint("deployment_tier", { mode: "number" }).notNull(),
+    securityPostureHash: text("security_posture_hash").notNull(),
+    reviewDigest: text("review_digest").notNull(),
+    policyHash: text("policy_hash").notNull(),
+    structuralManifest: jsonb("structural_manifest").$type<ReviewManifest>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("review_snapshots_review_digest_idx").on(table.reviewDigest),
+    index("review_snapshots_workspace_idx").on(table.workspaceId, table.createdAt),
+    check("review_snapshots_crf_check", sql`${table.crfVersion} = 'CRF-1'`),
+    check("review_snapshots_epoch_check", sql`${table.securityEpoch} > 0`),
+    check(
+      "review_snapshots_tier_check",
+      sql`${table.deploymentTier} BETWEEN 1 AND 3`,
+    ),
+  ],
+);
+
 export interface NewGitArtifact {
   id: string;
   workspaceId: string;
@@ -61,6 +104,32 @@ export interface GitArtifactRepository {
   findByDigest(digest: Sha256Digest): Promise<GitArtifact | undefined>;
   markValidated(id: string): Promise<GitArtifact>;
   markRejected(id: string, reason: string): Promise<GitArtifact>;
+}
+
+export interface NewReviewSnapshot {
+  id: string;
+  workspaceId: string;
+  repositoryId: string;
+  artifactId: string;
+  crfVersion: "CRF-1";
+  baseCommit: string;
+  targetCommit: string;
+  targetTree: string;
+  artifactDigest: Sha256Digest;
+  validatorProfileDigest: Sha256Digest;
+  validatorProfile: ValidatorProfile;
+  securityEpoch: number;
+  deploymentTier: number;
+  securityPostureHash: Sha256Digest;
+  reviewDigest: Sha256Digest;
+  policyHash: Sha256Digest;
+  structuralManifest: ReviewManifest;
+}
+
+export interface ReviewSnapshotRepository {
+  createForStagedArtifact(input: NewReviewSnapshot): Promise<ReviewSnapshot>;
+  get(id: string): Promise<ReviewSnapshot | undefined>;
+  findByArtifact(artifactId: string): Promise<ReviewSnapshot | undefined>;
 }
 
 export class PostgresGitArtifactRepository implements GitArtifactRepository {
@@ -133,10 +202,94 @@ export class PostgresGitArtifactRepository implements GitArtifactRepository {
   }
 }
 
+export class PostgresReviewSnapshotRepository implements ReviewSnapshotRepository {
+  public constructor(private readonly db: NodePgDatabase) {}
+
+  public async createForStagedArtifact(input: NewReviewSnapshot): Promise<ReviewSnapshot> {
+    return await this.db.transaction(async (transaction) => {
+      const [record] = await transaction.insert(reviewSnapshots).values(input).returning();
+      if (!record) {
+        throw new RadError("REVIEW_CREATE_FAILED", "Review snapshot was not created");
+      }
+      const [artifact] = await transaction
+        .update(gitArtifacts)
+        .set({ status: "VALIDATED", validatedAt: new Date(), rejectionReason: null })
+        .where(and(eq(gitArtifacts.id, input.artifactId), eq(gitArtifacts.status, "STAGED")))
+        .returning({ id: gitArtifacts.id });
+      if (!artifact) {
+        throw new RadError(
+          "ARTIFACT_STATE_CONFLICT",
+          `Artifact ${input.artifactId} is no longer staged`,
+        );
+      }
+      return asReviewSnapshot(record);
+    });
+  }
+
+  public async get(id: string): Promise<ReviewSnapshot | undefined> {
+    const [record] = await this.db
+      .select()
+      .from(reviewSnapshots)
+      .where(eq(reviewSnapshots.id, id))
+      .limit(1);
+    return record ? asReviewSnapshot(record) : undefined;
+  }
+
+  public async findByArtifact(artifactId: string): Promise<ReviewSnapshot | undefined> {
+    const [record] = await this.db
+      .select()
+      .from(reviewSnapshots)
+      .where(eq(reviewSnapshots.artifactId, artifactId))
+      .limit(1);
+    return record ? asReviewSnapshot(record) : undefined;
+  }
+}
+
 function asArtifact(record: typeof gitArtifacts.$inferSelect): GitArtifact {
   return {
     ...record,
     artifactDigest: sha256DigestSchema.parse(record.artifactDigest),
     status: gitArtifactStatusSchema.parse(record.status),
+  };
+}
+
+function asReviewSnapshot(record: typeof reviewSnapshots.$inferSelect): ReviewSnapshot {
+  const artifactDigest = sha256DigestSchema.parse(record.artifactDigest);
+  const validatorProfileDigest = sha256DigestSchema.parse(record.validatorProfileDigest);
+  const validatorProfile = validatorProfileSchema.parse(record.validatorProfile);
+  const securityPostureHash = sha256DigestSchema.parse(record.securityPostureHash);
+  const reviewDigest = sha256DigestSchema.parse(record.reviewDigest);
+  const policyHash = sha256DigestSchema.parse(record.policyHash);
+  const structuralManifest = reviewManifestSchema.parse(record.structuralManifest);
+  if (
+    digestCanonical(validatorProfile) !== validatorProfileDigest ||
+    digestCanonical(structuralManifest) !== reviewDigest ||
+    structuralManifest.repositoryId !== record.repositoryId ||
+    structuralManifest.workspaceId !== record.workspaceId ||
+    structuralManifest.baseCommit !== record.baseCommit ||
+    structuralManifest.targetCommit !== record.targetCommit ||
+    structuralManifest.targetTree !== record.targetTree ||
+    structuralManifest.artifactDigest !== artifactDigest ||
+    structuralManifest.validatorProfileDigest !== validatorProfileDigest ||
+    structuralManifest.policyDigest !== policyHash ||
+    structuralManifest.securityEpoch !== record.securityEpoch ||
+    structuralManifest.deploymentTier !== record.deploymentTier ||
+    structuralManifest.securityPostureHash !== securityPostureHash
+  ) {
+    throw new RadError(
+      "REVIEW_INTEGRITY_FAILED",
+      `Review snapshot ${record.id} failed canonical integrity verification`,
+    );
+  }
+  return {
+    ...record,
+    crfVersion: "CRF-1",
+    artifactDigest,
+    validatorProfileDigest,
+    validatorProfile,
+    securityPostureHash,
+    reviewDigest,
+    policyHash,
+    structuralManifest,
   };
 }

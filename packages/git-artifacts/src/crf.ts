@@ -84,11 +84,33 @@ export const reviewManifestSchema = z
     artifactDigest: sha256DigestSchema,
     validatorProfileDigest: sha256DigestSchema,
     policyDigest: sha256DigestSchema,
-    securityEpoch: z.number().int().nonnegative(),
-    securityPostureDigest: sha256DigestSchema,
+    securityEpoch: z.number().int().positive(),
+    deploymentTier: z.number().int().min(1).max(3),
+    securityPostureHash: sha256DigestSchema,
     files: z.array(structuralFileSchema).max(10_000)
   })
-  .strict();
+  .strict()
+  .superRefine((manifest, context) => {
+    const expectedLength = manifest.gitObjectFormat === "sha1" ? 40 : 64;
+    for (const field of ["baseCommit", "targetCommit", "targetTree"] as const) {
+      if (manifest[field].length !== expectedLength) {
+        context.addIssue({
+          code: "custom",
+          path: [field],
+          message: `${field} does not match the declared Git object format`,
+        });
+      }
+    }
+    for (const [index, file] of manifest.files.entries()) {
+      if (file.oldBlob.length !== expectedLength || file.newBlob.length !== expectedLength) {
+        context.addIssue({
+          code: "custom",
+          path: ["files", index],
+          message: "blob ID does not match the declared Git object format",
+        });
+      }
+    }
+  });
 export type ReviewManifest = z.infer<typeof reviewManifestSchema>;
 
 export function canonicalJson(value: unknown): string {

@@ -1,6 +1,10 @@
 import { loadRuntimeConfig } from "@rad/shared";
 import { PostgresAgentTaskRepository } from "@rad/agents";
-import { PostgresGitArtifactRepository } from "@rad/git-artifacts";
+import {
+  PostgresGitArtifactRepository,
+  PostgresReviewSnapshotRepository,
+  digestCanonical,
+} from "@rad/git-artifacts";
 import {
   PostgresWorkspaceRepository,
   WorkspaceCoordinator,
@@ -15,13 +19,39 @@ import { TaskService } from "./tasks/task-service.js";
 import { startDiscordBot } from "./discord/bot.js";
 import { ArtifactService } from "./artifacts/artifact-service.js";
 import { ArtifactStore } from "./artifacts/artifact-store.js";
+import { DockerValidatorLauncher } from "./validation/docker-validator.js";
+import { ReviewService } from "./validation/review-service.js";
 
 const config = loadRuntimeConfig();
 const { db, pool } = createDatabase(config.RAD_DATABASE_URL);
 const repository = new PostgresWorkspaceRepository(db);
+await repository.synchronizeSecurityMetadata({
+  deploymentTier: config.RAD_DEPLOYMENT_TIER,
+  securityPostureHash: digestCanonical({
+    schemaVersion: "tier1-security-posture-1",
+    deploymentTier: config.RAD_DEPLOYMENT_TIER,
+    sandboxBackend: config.RAD_SANDBOX_BACKEND,
+    workspaceImage: config.RAD_WORKSPACE_IMAGE,
+    workspaceNetwork: config.RAD_WORKSPACE_NETWORK,
+    controlNetwork: config.RAD_CONTROL_NETWORK,
+    workspaceMemoryMegabytes: config.RAD_WORKSPACE_MEMORY_MB,
+    workspaceCpus: config.RAD_WORKSPACE_CPUS,
+    workspacePids: config.RAD_WORKSPACE_PIDS,
+    artifactRoot: config.RAD_ARTIFACT_ROOT,
+    artifactVolume: config.RAD_ARTIFACT_VOLUME,
+    artifactMaxBytes: config.RAD_ARTIFACT_MAX_BYTES,
+    validatorImage: config.RAD_VALIDATOR_IMAGE,
+    validatorImageDigest: config.RAD_VALIDATOR_IMAGE_DIGEST || null,
+    validatorMemoryMegabytes: config.RAD_VALIDATOR_MEMORY_MB,
+    validatorCpus: config.RAD_VALIDATOR_CPUS,
+    validatorPids: config.RAD_VALIDATOR_PIDS,
+    validatorTimeoutMilliseconds: config.RAD_VALIDATOR_TIMEOUT_MS,
+  }),
+});
+const commandRunner = new ExecFileCommandRunner();
 const supervisor = new DockerSandboxSupervisor(
   config,
-  new ExecFileCommandRunner(),
+  commandRunner,
   async (id) => repository.getRepository(id),
 );
 const reconciler = new WorkspaceReconciler(repository, supervisor);
@@ -42,6 +72,13 @@ const artifactService = new ArtifactService(
   supervisor,
   artifactStore,
 );
+const reviewService = new ReviewService(
+  new PostgresGitArtifactRepository(db),
+  new PostgresReviewSnapshotRepository(db),
+  repository,
+  repository,
+  new DockerValidatorLauncher(config, commandRunner),
+);
 const server = createControlServer({
   config,
   repository,
@@ -50,6 +87,7 @@ const server = createControlServer({
   coordinator,
   taskService,
   artifactService,
+  reviewService,
 });
 
 const reconcileTimer = setInterval(() => {
