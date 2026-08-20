@@ -81,6 +81,12 @@ export class SecurityMigrationService {
       maintenanceReason,
       requestedAt,
     );
+    if (maintenance.maintenanceReason !== maintenanceReason) {
+      throw new RadError(
+        "MAINTENANCE_MODE_ALREADY_ACTIVE",
+        "A concurrent maintenance operation won the migration lock",
+      );
+    }
     await this.audit.append(auditRecord(
       "SECURITY_POSTURE_MIGRATION_STARTED",
       input,
