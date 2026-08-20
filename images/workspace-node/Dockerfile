@@ -6,20 +6,29 @@ COPY apps ./apps
 COPY packages ./packages
 RUN npm ci --ignore-scripts && npm run build && npm prune --omit=dev
 
-FROM node:24.19.0-bookworm-slim
-
+FROM node:24.19.0-bookworm-slim AS tools
 ARG CODEX_VERSION=0.148.0
 ARG CODE_SERVER_VERSION=4.133.0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install --global --unsafe-perm "@openai/codex@${CODEX_VERSION}" "code-server@${CODE_SERVER_VERSION}" \
+    && npm cache clean --force
+
+FROM node:24.19.0-bookworm-slim
+
 ENV NODE_ENV=production \
     HOME=/home/codex \
     CODEX_HOME=/home/codex/.codex
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git procps tini \
+    && apt-get install -y --no-install-recommends ca-certificates git libatomic1 procps tini \
     && rm -rf /var/lib/apt/lists/* \
-    && npm install --global --unsafe-perm "@openai/codex@${CODEX_VERSION}" "code-server@${CODE_SERVER_VERSION}" \
-    && npm cache clean --force \
-    && useradd --uid 10001 --create-home --shell /bin/bash codex
+    && useradd --uid 10001 --create-home --shell /bin/bash codex \
+    && ln -s /usr/local/lib/node_modules/@openai/codex/bin/codex.js /usr/local/bin/codex \
+    && ln -s /usr/local/lib/node_modules/code-server/out/node/entry.js /usr/local/bin/code-server
+
+COPY --from=tools /usr/local/lib/node_modules /usr/local/lib/node_modules
 
 WORKDIR /opt/rad
 COPY --from=build /opt/rad/apps/agent-worker/dist ./agent-worker/dist
