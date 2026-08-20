@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/shared" },
+    { "path": "./packages/agents" },
+    { "path": "./packages/workspace-state" },
+    { "path": "./apps/control" },
+    { "path": "./apps/agent-worker" },
+    { "path": "./apps/web" }
+  ]
+}

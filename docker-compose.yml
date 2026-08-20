@@ -1,0 +1,68 @@
+name: remote-agent-devbox
+
+services:
+  database:
+    image: postgres:16.4-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: rad
+      POSTGRES_USER: rad
+      POSTGRES_PASSWORD: ${RAD_POSTGRES_PASSWORD:?RAD_POSTGRES_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rad -d rad"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - control
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./packages/workspace-state/migrations/0001_workspace_state.sql:/docker-entrypoint-initdb.d/001_workspace_state.sql:ro
+      - ./packages/agents/migrations/0001_agent_tasks.sql:/docker-entrypoint-initdb.d/002_agent_tasks.sql:ro
+    security_opt:
+      - no-new-privileges:true
+
+  control:
+    build:
+      context: .
+      dockerfile: images/control/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RAD_HOST: 0.0.0.0
+      RAD_DATABASE_URL: postgresql://rad:${RAD_POSTGRES_PASSWORD}@database:5432/rad
+      RAD_CONTROL_NETWORK: ${RAD_CONTROL_NETWORK:-rad-control}
+      RAD_WORKSPACE_NETWORK: ${RAD_WORKSPACE_NETWORK:-rad-workspace}
+      RAD_WORKSPACE_IMAGE: ${RAD_WORKSPACE_IMAGE:-remote-agent-devbox-workspace-node:local}
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${RAD_PORT:-3000}:3000"
+    networks:
+      - control
+      - egress
+    volumes:
+      - ${RAD_DOCKER_SOCKET:-/run/user/1000/docker.sock}:/var/run/docker.sock
+    security_opt:
+      - no-new-privileges:true
+
+  workspace-image:
+    image: ${RAD_WORKSPACE_IMAGE:-remote-agent-devbox-workspace-node:local}
+    build:
+      context: .
+      dockerfile: images/workspace-node/Dockerfile
+    profiles: ["build"]
+
+networks:
+  control:
+    name: ${RAD_CONTROL_NETWORK:-rad-control}
+    internal: true
+  workspace:
+    name: ${RAD_WORKSPACE_NETWORK:-rad-workspace}
+  egress:
+    name: remote-agent-devbox-egress
+
+volumes:
+  postgres-data:

@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "agent/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  code:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 22.15.0
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm run build
+      - run: npm audit --audit-level=high
+
+  containers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: code
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: docker/setup-buildx-action@v3.11.1
+      - name: Build control image
+        uses: docker/build-push-action@v6.18.0
+        with:
+          context: .
+          file: images/control/Dockerfile
+          push: false
+          tags: remote-agent-devbox-control:ci
+      - name: Build workspace image
+        uses: docker/build-push-action@v6.18.0
+        with:
+          context: .
+          file: images/workspace-node/Dockerfile
+          push: false
+          tags: remote-agent-devbox-workspace-node:ci
+

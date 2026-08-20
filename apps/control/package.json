@@ -1,0 +1,21 @@
+{
+  "name": "@rad/control",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@rad/agents": "0.0.0",
+    "@rad/shared": "0.0.0",
+    "@rad/workspace-state": "0.0.0",
+    "@fastify/static": "10.1.3",
+    "discord.js": "14.27.0",
+    "fastify": "5.12.1",
+    "zod": "4.4.3"
+  }
+}

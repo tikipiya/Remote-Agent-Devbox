@@ -1,0 +1,41 @@
+import { describe, expect, it } from "vitest";
+
+import { loadRuntimeConfig } from "./config.js";
+
+const validEnvironment = {
+  RAD_DATABASE_URL: "postgresql://rad:rad@localhost:5432/rad",
+  RAD_WORKSPACE_IMAGE: "rad/workspace:local",
+};
+
+describe("loadRuntimeConfig", () => {
+  it("loads conservative Tier 1 defaults", () => {
+    const config = loadRuntimeConfig(validEnvironment);
+
+    expect(config.RAD_DEPLOYMENT_TIER).toBe(1);
+    expect(config.RAD_WORKSPACE_NETWORK).not.toBe(config.RAD_CONTROL_NETWORK);
+    expect(config.RAD_WORKSPACE_PIDS).toBeGreaterThan(0);
+  });
+
+  it("fails closed when workspace and control networks are shared", () => {
+    expect(() =>
+      loadRuntimeConfig({
+        ...validEnvironment,
+        RAD_WORKSPACE_NETWORK: "shared",
+        RAD_CONTROL_NETWORK: "shared",
+      }),
+    ).toThrow(/must be different/);
+  });
+
+  it("rejects a silent deployment tier downgrade", () => {
+    expect(() =>
+      loadRuntimeConfig({ ...validEnvironment, RAD_DEPLOYMENT_TIER: "0" }),
+    ).toThrow();
+  });
+
+  it("requires Discord credentials as a pair", () => {
+    expect(() =>
+      loadRuntimeConfig({ ...validEnvironment, RAD_DISCORD_TOKEN: "secret" }),
+    ).toThrow(/configured together/);
+  });
+});
+

@@ -1,0 +1,9 @@
+# Tier 1 trusted control boundary and enforced isolation configuration.
+/apps/control/ @tikipiya
+/packages/workspace-state/ @tikipiya
+/packages/agents/ @tikipiya
+/images/ @tikipiya
+/security/ @tikipiya
+/docker-compose.yml @tikipiya
+/SECURITY.md @tikipiya
+
