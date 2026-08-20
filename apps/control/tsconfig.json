@@ -6,6 +6,7 @@
     "outDir": "dist"
   },
   "references": [
+    { "path": "../../packages/audit-events" },
     { "path": "../../packages/shared" },
     { "path": "../../packages/agents" },
     { "path": "../../packages/approvals" },

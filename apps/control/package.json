@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@rad/audit-events": "0.0.0",
     "@rad/agents": "0.0.0",
     "@rad/approvals": "0.0.0",
     "@rad/git-artifacts": "0.0.0",

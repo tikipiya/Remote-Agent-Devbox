@@ -9,7 +9,6 @@ import { GitHubAppTokenIssuer } from "@rad/github-token-issuer";
 import {
   PostgresGitArtifactRepository,
   PostgresReviewSnapshotRepository,
-  digestCanonical,
 } from "@rad/git-artifacts";
 import {
   PostgresWorkspaceRepository,
@@ -35,37 +34,14 @@ import { CredentialedGitWriteExecutor } from "./git/git-write-executor.js";
 import { TrustedGitWriter } from "./git/git-writer.js";
 import { GitHubPullRequestCreator } from "./git/github-pull-request.js";
 import { MaintenanceModeGuard } from "./security/maintenance-guard.js";
+import { buildSecurityPostureHash } from "./security/security-posture.js";
 
 const config = loadRuntimeConfig();
 const { db, pool } = createDatabase(config.RAD_DATABASE_URL);
 const repository = new PostgresWorkspaceRepository(db);
 await repository.synchronizeSecurityMetadata({
   deploymentTier: config.RAD_DEPLOYMENT_TIER,
-  securityPostureHash: digestCanonical({
-    schemaVersion: "tier1-security-posture-1",
-    deploymentTier: config.RAD_DEPLOYMENT_TIER,
-    sandboxBackend: config.RAD_SANDBOX_BACKEND,
-    workspaceImage: config.RAD_WORKSPACE_IMAGE,
-    workspaceNetwork: config.RAD_WORKSPACE_NETWORK,
-    controlNetwork: config.RAD_CONTROL_NETWORK,
-    workspaceMemoryMegabytes: config.RAD_WORKSPACE_MEMORY_MB,
-    workspaceCpus: config.RAD_WORKSPACE_CPUS,
-    workspacePids: config.RAD_WORKSPACE_PIDS,
-    artifactRoot: config.RAD_ARTIFACT_ROOT,
-    artifactVolume: config.RAD_ARTIFACT_VOLUME,
-    artifactMaxBytes: config.RAD_ARTIFACT_MAX_BYTES,
-    validatorImage: config.RAD_VALIDATOR_IMAGE,
-    validatorImageDigest: config.RAD_VALIDATOR_IMAGE_DIGEST || null,
-    validatorMemoryMegabytes: config.RAD_VALIDATOR_MEMORY_MB,
-    validatorCpus: config.RAD_VALIDATOR_CPUS,
-    validatorPids: config.RAD_VALIDATOR_PIDS,
-    validatorTimeoutMilliseconds: config.RAD_VALIDATOR_TIMEOUT_MS,
-    approvalTtlSeconds: config.RAD_APPROVAL_TTL_SECONDS,
-    githubApiUrl: config.RAD_GITHUB_API_URL,
-    githubAppId: config.RAD_GITHUB_APP_ID || null,
-    githubInstallationId: config.RAD_GITHUB_INSTALLATION_ID ?? null,
-    githubPrivateKeyConfigured: Boolean(config.RAD_GITHUB_PRIVATE_KEY_BASE64),
-  }),
+  securityPostureHash: buildSecurityPostureHash(config),
 });
 const commandRunner = new ExecFileCommandRunner();
 const operationalGuard = new MaintenanceModeGuard(repository);
