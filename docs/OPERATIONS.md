@@ -38,6 +38,44 @@ validator. Run the standalone boundary check with a built image tagged
 npm run verify:validator
 ```
 
+## GitHub App for approved Git writes
+
+Create and install a GitHub App on each target repository. Grant only these
+repository permissions:
+
+- Contents: Read and write
+- Pull requests: Read and write
+
+The App does not need webhook subscriptions. Record its numeric App ID and the
+installation ID, generate a private key, and encode the complete PEM file as
+base64 without changing its bytes. Set:
+
+```text
+RAD_GITHUB_API_URL=https://api.github.com
+RAD_GITHUB_APP_ID=<numeric-app-id>
+RAD_GITHUB_INSTALLATION_ID=<numeric-installation-id>
+RAD_GITHUB_PRIVATE_KEY_BASE64=<base64-encoded-pem>
+```
+
+Restart `rad-control` after changing credentials. Installation tokens are
+requested only after an approval and exact final revalidation; they are scoped
+to the target repository and are never stored by Remote Agent Devbox.
+
+Fresh PostgreSQL volumes load all schemas automatically. For an existing
+volume, apply `005_approval_requests.sql` and then `006_git_operations.sql`
+from the Compose init mapping before enabling Git writes. Back up the database
+and apply them using the same database owner used by `rad-control`.
+
+Run the credential-free remote compare-and-swap boundary test locally:
+
+```bash
+npm run verify:git-cas
+```
+
+Before claiming Security Gate C for a deployment, create an immutable Review
+Snapshot, approve it, and complete one real pull request using that deployment's
+GitHub App installation. Do not reuse production credentials for CI.
+
 ## Codex identity
 
 The key remains in the Tier 1 control process and is forwarded only to a

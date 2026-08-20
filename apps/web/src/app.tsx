@@ -346,7 +346,7 @@ function ReviewSummary({
           ) : approval.status === "APPROVED" && !operation ? (
             <Button size="sm" disabled={isPending} onClick={onStartOperation}>
               {isPending ? <LoaderCircle className="animate-spin" size={14} /> : <GitBranch size={14} />}
-              Final revalidation
+              Create pull request
             </Button>
           ) : null}
         </div>
@@ -361,6 +361,16 @@ function ReviewSummary({
             <div className="mt-2 text-rose-300">
               {operation.staleReason ?? operation.errorCode}
             </div>
+          ) : null}
+          {operation.pullRequestUrl ? (
+            <a
+              className="mt-2 inline-flex items-center gap-1 text-cyan-300 hover:text-cyan-200"
+              href={operation.pullRequestUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink size={13} /> Open pull request
+            </a>
           ) : null}
         </div>
       ) : null}

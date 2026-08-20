@@ -16,8 +16,14 @@ Workspace and validation containers are enforced isolation boundaries. A
 workspace must never receive a Docker socket, GitHub write credential, control
 plane credential, or route to the control network.
 
+The approved Git write path binds an expiry-bounded approval to an immutable
+review and the current security epoch, then repeats exact validation before a
+single compare-and-swap push to the Workspace's dedicated agent branch. GitHub
+App installation tokens are repository-scoped and retained only in memory.
+See [Security Gate C](./docs/security/SECURITY_GATE_C.md) for enforced
+properties and the deployment verification requirement.
+
 ## Reporting a vulnerability
 
 Do not open a public issue for an undisclosed vulnerability. Use GitHub's
 private vulnerability reporting feature for this repository.
-
