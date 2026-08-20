@@ -6,6 +6,7 @@
     { "path": "./packages/workspace-state" },
     { "path": "./packages/git-artifacts" },
     { "path": "./packages/approvals" },
+    { "path": "./packages/git-operations" },
     { "path": "./apps/control" },
     { "path": "./apps/agent-worker" },
     { "path": "./apps/validator" },
