@@ -7,8 +7,8 @@
   },
   "references": [
     { "path": "../../packages/shared" },
+    { "path": "../../packages/agents" },
     { "path": "../../packages/workspace-state" }
   ],
   "include": ["src/**/*.ts"]
 }
-

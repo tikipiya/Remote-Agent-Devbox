@@ -14,7 +14,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@rad/shared": "0.0.0"
+    "@rad/shared": "0.0.0",
+    "drizzle-orm": "0.45.2"
   }
 }
-

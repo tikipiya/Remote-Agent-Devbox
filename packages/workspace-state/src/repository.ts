@@ -29,6 +29,7 @@ export interface NewWorkspace {
 export interface WorkspaceRepository {
   createRepository(input: NewRepository): Promise<Repository>;
   getRepository(id: string): Promise<Repository | undefined>;
+  findRepositoryByRemoteUrl(remoteUrl: string): Promise<Repository | undefined>;
   createWorkspace(input: NewWorkspace): Promise<Workspace>;
   getWorkspace(id: string): Promise<Workspace | undefined>;
   listForReconciliation(): Promise<Workspace[]>;
@@ -69,6 +70,17 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository {
       .select()
       .from(repositories)
       .where(eq(repositories.id, id))
+      .limit(1);
+    return record;
+  }
+
+  public async findRepositoryByRemoteUrl(
+    remoteUrl: string,
+  ): Promise<Repository | undefined> {
+    const [record] = await this.db
+      .select()
+      .from(repositories)
+      .where(eq(repositories.remoteUrl, remoteUrl))
       .limit(1);
     return record;
   }
@@ -162,4 +174,3 @@ function asWorkspace(record: typeof workspaces.$inferSelect): Workspace {
     sandboxBackend: "docker",
   };
 }
-

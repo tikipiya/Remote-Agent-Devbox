@@ -9,20 +9,24 @@ export interface CommandResult {
 }
 
 export interface CommandRunner {
-  run(executable: string, args: readonly string[]): Promise<CommandResult>;
+  run(
+    executable: string,
+    args: readonly string[],
+    options?: { timeoutMs?: number },
+  ): Promise<CommandResult>;
 }
 
 export class ExecFileCommandRunner implements CommandRunner {
   public async run(
     executable: string,
     args: readonly string[],
+    options: { timeoutMs?: number } = {},
   ): Promise<CommandResult> {
     return execFileAsync(executable, [...args], {
       encoding: "utf8",
       maxBuffer: 1024 * 1024,
-      timeout: 30_000,
+      timeout: options.timeoutMs ?? 30_000,
       windowsHide: true,
     });
   }
 }
-

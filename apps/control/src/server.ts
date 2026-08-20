@@ -16,6 +16,7 @@ import type {
 } from "@rad/workspace-state";
 
 import type { DockerSandboxSupervisor } from "./workspace/docker-supervisor.js";
+import type { TaskService } from "./tasks/task-service.js";
 
 export interface ControlServices {
   config: RuntimeConfig;
@@ -23,6 +24,7 @@ export interface ControlServices {
   coordinator: Pick<WorkspaceCoordinator, "requestState">;
   reconciler: Pick<WorkspaceReconciler, "reconcile" | "reconcileAll">;
   supervisor: Pick<DockerSandboxSupervisor, "getIdeUrl">;
+  taskService: Pick<TaskService, "run" | "get">;
 }
 
 const repositoryBodySchema = z.object({
@@ -38,6 +40,10 @@ const workspaceBodySchema = z.object({
 });
 
 const stateBodySchema = z.object({ state: desiredWorkspaceStateSchema });
+const taskBodySchema = z.object({
+  prompt: z.string().min(1).max(64 * 1024),
+  requestedBy: z.string().min(1).max(255),
+});
 const idParamsSchema = z.object({ id: z.uuid() });
 
 export function createControlServer(services: ControlServices): FastifyInstance {
@@ -106,6 +112,20 @@ export function createControlServer(services: ControlServices): FastifyInstance 
     const { id } = idParamsSchema.parse(request.params);
     const { state } = stateBodySchema.parse(request.body);
     return services.coordinator.requestState(id, state);
+  });
+
+  server.post("/api/workspaces/:id/tasks", async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const input = taskBodySchema.parse(request.body);
+    const task = await services.taskService.run(id, input.prompt, input.requestedBy);
+    return reply.status(201).send(task);
+  });
+
+  server.get("/api/tasks/:id", async (request) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const task = await services.taskService.get(id);
+    if (!task) throw new RadError("TASK_NOT_FOUND", `Task ${id} not found`);
+    return task;
   });
 
   return server;

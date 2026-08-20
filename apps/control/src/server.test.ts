@@ -17,6 +17,7 @@ function testServices(): ControlServices {
     repository: {
       createRepository: unavailable,
       getRepository: unavailable,
+      findRepositoryByRemoteUrl: unavailable,
       createWorkspace: unavailable,
       getWorkspace: unavailable,
       listForReconciliation: unavailable,
@@ -30,6 +31,10 @@ function testServices(): ControlServices {
     },
     supervisor: {
       getIdeUrl: unavailable,
+    },
+    taskService: {
+      run: unavailable,
+      get: unavailable,
     },
   };
 }

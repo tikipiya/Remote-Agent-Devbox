@@ -32,6 +32,10 @@ class MemoryRepository implements WorkspaceRepository {
     return undefined;
   }
 
+  public async findRepositoryByRemoteUrl(): Promise<Repository | undefined> {
+    return undefined;
+  }
+
   public async createWorkspace(input: NewWorkspace): Promise<Workspace> {
     this.workspace = {
       ...makeWorkspace(),
@@ -197,4 +201,3 @@ function makeWorkspace(): Workspace {
     lastError: null,
   };
 }
-

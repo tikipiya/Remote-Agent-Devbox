@@ -24,6 +24,7 @@ export const runtimeConfigSchema = z
     RAD_WORKSPACE_ROOT: z.string().min(1).default("/workspaces"),
     RAD_DISCORD_TOKEN: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_APPLICATION_ID: z.string().min(1).optional().or(z.literal("")),
+    RAD_DISCORD_GUILD_ID: z.string().min(1).optional().or(z.literal("")),
   })
   .superRefine((config, context) => {
     if (config.RAD_WORKSPACE_NETWORK === config.RAD_CONTROL_NETWORK) {
@@ -52,4 +53,3 @@ export function loadRuntimeConfig(
 ): RuntimeConfig {
   return runtimeConfigSchema.parse(environment);
 }
-

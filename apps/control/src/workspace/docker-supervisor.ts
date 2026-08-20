@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { Buffer } from "node:buffer";
 
 import {
   RadError,
@@ -15,6 +16,12 @@ import type {
 import type { CommandRunner } from "./command-runner.js";
 
 type RepositoryResolver = (id: string) => Promise<Repository | undefined>;
+
+export interface AgentExecutionResult {
+  threadId: string;
+  turnId: string;
+  message: string;
+}
 
 export class DockerSandboxSupervisor implements SandboxSupervisor {
   public constructor(
@@ -90,6 +97,50 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
     ]);
     const match = /127\.0\.0\.1:(\d+)/.exec(result.stdout);
     return match?.[1] ? `http://127.0.0.1:${match[1]}` : undefined;
+  }
+
+  public async runTask(workspace: Workspace, task: string): Promise<AgentExecutionResult> {
+    if ((await this.inspect(workspace)) !== "RUNNING") {
+      throw new RadError("WORKSPACE_NOT_READY", `Workspace ${workspace.id} is not running`);
+    }
+    const payload = Buffer.from(
+      JSON.stringify({ task, cwd: "/workspace/repository" }),
+      "utf8",
+    ).toString("base64url");
+    const result = await this.commandRunner.run(
+      "docker",
+      [
+        "container",
+        "exec",
+        "--user",
+        "10001:10001",
+        "--workdir",
+        "/workspace/repository",
+        containerName(workspace.id),
+        "node",
+        "/opt/rad/agent-worker/dist/main.js",
+        payload,
+      ],
+      { timeoutMs: 60 * 60 * 1000 },
+    );
+    const events = result.stdout
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const completed = events.find((event) => event.event === "task_completed");
+    if (
+      !completed ||
+      typeof completed.threadId !== "string" ||
+      typeof completed.turnId !== "string" ||
+      typeof completed.message !== "string"
+    ) {
+      throw new RadError("AGENT_TASK_FAILED", "Agent worker did not return completion");
+    }
+    return {
+      threadId: completed.threadId,
+      turnId: completed.turnId,
+      message: completed.message,
+    };
   }
 
   public createArguments(
