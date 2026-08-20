@@ -46,6 +46,7 @@ services:
       - egress
     volumes:
       - ${RAD_DOCKER_SOCKET:-/run/user/1000/docker.sock}:/var/run/docker.sock
+      - artifact-data:/var/lib/rad/artifacts
     security_opt:
       - no-new-privileges:true
 
@@ -67,3 +68,4 @@ networks:
 
 volumes:
   postgres-data:
+  artifact-data:

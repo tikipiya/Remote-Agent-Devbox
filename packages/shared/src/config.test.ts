@@ -14,6 +14,7 @@ describe("loadRuntimeConfig", () => {
     expect(config.RAD_DEPLOYMENT_TIER).toBe(1);
     expect(config.RAD_WORKSPACE_NETWORK).not.toBe(config.RAD_CONTROL_NETWORK);
     expect(config.RAD_WORKSPACE_PIDS).toBeGreaterThan(0);
+    expect(config.RAD_ARTIFACT_MAX_BYTES).toBe(64 * 1024 * 1024);
   });
 
   it("fails closed when workspace and control networks are shared", () => {

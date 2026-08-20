@@ -27,8 +27,8 @@ export const gitArtifacts = pgTable(
     id: uuid("id").primaryKey(),
     workspaceId: uuid("workspace_id").notNull(),
     repositoryId: uuid("repository_id").notNull(),
-    artifactDigest: text("artifact_digest").notNull().unique(),
-    storageKey: text("storage_key").notNull().unique(),
+    artifactDigest: text("artifact_digest").notNull(),
+    storageKey: text("storage_key").notNull(),
     sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
     status: text("status").notNull(),
     rejectionReason: text("rejection_reason"),
@@ -37,6 +37,7 @@ export const gitArtifacts = pgTable(
   },
   (table) => [
     index("git_artifacts_workspace_idx").on(table.workspaceId, table.createdAt),
+    index("git_artifacts_digest_idx").on(table.artifactDigest),
     check("git_artifacts_size_check", sql`${table.sizeBytes} > 0`),
     check(
       "git_artifacts_status_check",

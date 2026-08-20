@@ -14,7 +14,7 @@ ENV NODE_ENV=production
 WORKDIR /opt/rad
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=build --chown=node:node /opt/rad /opt/rad
+RUN mkdir -p /var/lib/rad/artifacts && chown node:node /var/lib/rad/artifacts
 USER node
 EXPOSE 3000
 CMD ["node", "apps/control/dist/main.js"]
-

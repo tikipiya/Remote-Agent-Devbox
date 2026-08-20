@@ -21,6 +21,10 @@ export const runtimeConfigSchema = z
     RAD_WORKSPACE_PIDS: positiveInteger.min(32).default(256),
     RAD_WORKSPACE_TTL_SECONDS: positiveInteger.min(60).default(14_400),
     RAD_RECONCILE_INTERVAL_MS: positiveInteger.min(250).default(5_000),
+    RAD_ARTIFACT_ROOT: z.string().min(1).default("/var/lib/rad/artifacts"),
+    RAD_ARTIFACT_MAX_BYTES: positiveInteger
+      .max(1024 * 1024 * 1024)
+      .default(64 * 1024 * 1024),
     RAD_CODEX_API_KEY: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_TOKEN: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_APPLICATION_ID: z.string().min(1).optional().or(z.literal("")),
