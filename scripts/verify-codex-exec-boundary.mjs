@@ -1,12 +1,21 @@
-import { spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 import { CodexAppServerClient } from "../packages/agents/dist/app-server-client.js";
 
+const execFileAsync = promisify(execFile);
+const modelTask = process.argv.includes("--model-task");
+const apiKey = modelTask
+  ? requiredEnvironment("RAD_CODEX_API_KEY")
+  : "sk-test-not-a-real-key";
 const codexHome = await mkdtemp(join(tmpdir(), "rad-codex-boundary-"));
+const verificationWorkspace = await mkdtemp(join(tmpdir(), "rad-codex-workspace-"));
+await writeFile(join(verificationWorkspace, "proof.txt"), "before\n", "utf8");
+await execFileAsync("git", ["init", verificationWorkspace], { windowsHide: true });
 const port = await reservePort();
 const execServerUrl = `ws://127.0.0.1:${port}`;
 const baseEnvironment = pickEnvironment(["PATH", "HOME", "LANG", "LC_ALL"]);
@@ -23,6 +32,7 @@ const execServer = spawn(
     "multi_agent",
   ],
   {
+    cwd: verificationWorkspace,
     env: baseEnvironment,
     stdio: ["ignore", "ignore", "pipe"],
     windowsHide: true,
@@ -39,7 +49,7 @@ try {
     {
       env: {
         ...baseEnvironment,
-        OPENAI_API_KEY: "sk-test-not-a-real-key",
+        OPENAI_API_KEY: apiKey,
       },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
@@ -59,6 +69,20 @@ try {
       environmentId: "boundary-verification",
       execServerUrl,
     });
+    if (modelTask) {
+      await client.runTask(
+        "Replace the entire contents of proof.txt with the text 'remote execution verified' without quotes or trailing punctuation. Do not modify any other file.",
+        verificationWorkspace,
+        {
+          environmentId: "boundary-verification",
+          execServerUrl,
+        },
+      );
+      const proof = await readFile(join(verificationWorkspace, "proof.txt"), "utf8");
+      if (proof.trim() !== "remote execution verified") {
+        throw new Error(`Unexpected proof.txt contents: ${JSON.stringify(proof)}`);
+      }
+    }
   } catch (error) {
     throw new Error(`${String(error)}\n${appStderr()}`);
   } finally {
@@ -70,13 +94,21 @@ try {
       appServer: "initialized",
       execEnvironment: "ready",
       execServerHasApiKey: false,
-      modelCalled: false,
+      modelCalled: modelTask,
+      workspaceEditVerified: modelTask,
     })}\n`,
   );
 } finally {
   if (appServer) await stop(appServer);
   await stop(execServer);
   await rm(codexHome, { recursive: true, force: true });
+  await rm(verificationWorkspace, { recursive: true, force: true });
+}
+
+function requiredEnvironment(name) {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} is required with --model-task`);
+  return value;
 }
 
 function pickEnvironment(names) {

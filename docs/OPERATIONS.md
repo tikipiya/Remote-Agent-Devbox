@@ -30,6 +30,14 @@ Verify the real App Server to Exec Server protocol without making a model call:
 npm run verify:codex-boundary
 ```
 
+After exporting `RAD_CODEX_API_KEY`, run the opt-in authenticated check. It
+makes a real model request and verifies that Codex edits a temporary repository
+through the Exec Server:
+
+```bash
+npm run verify:codex-task
+```
+
 ## Rootless Docker socket
 
 The default socket is `/run/user/1000/docker.sock`. Set

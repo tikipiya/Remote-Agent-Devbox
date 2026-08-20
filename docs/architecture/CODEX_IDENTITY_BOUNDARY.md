@@ -53,3 +53,7 @@ model request. CI repeats the same check inside the production Workspace image.
 Supervisor and Security Gate A tests also assert that the key value is absent
 from Docker arguments and that the Workspace has no credential or Runner volume
 mount.
+
+`npm run verify:codex-task` is the explicit, operator-run completion check. It
+requires `RAD_CODEX_API_KEY`, makes a real model request, and verifies an edit in
+a disposable repository executed through the credential-free Exec Server.
