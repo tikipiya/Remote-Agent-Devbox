@@ -1,4 +1,4 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
@@ -11,6 +11,7 @@ import {
 } from "@rad/shared";
 
 import { instanceMetadata, repositories, workspaces } from "./schema.js";
+import { assertStartupSecurityMetadata } from "./security-posture.js";
 
 export interface NewRepository {
   id: string;
@@ -84,25 +85,17 @@ export class PostgresWorkspaceRepository implements WorkspaceRepository, Instanc
     deploymentTier: number;
     securityPostureHash: string;
   }): Promise<InstanceSecurityMetadata> {
-    const [record] = await this.db
+    const [inserted] = await this.db
       .insert(instanceMetadata)
       .values({ singletonKey: "instance", securityEpoch: 1, ...input })
-      .onConflictDoUpdate({
-        target: instanceMetadata.singletonKey,
-        set: {
-          securityEpoch: sql`CASE
-            WHEN ${instanceMetadata.deploymentTier} <> ${input.deploymentTier}
-              OR ${instanceMetadata.securityPostureHash} <> ${input.securityPostureHash}
-            THEN ${instanceMetadata.securityEpoch} + 1
-            ELSE ${instanceMetadata.securityEpoch}
-          END`,
-          deploymentTier: input.deploymentTier,
-          securityPostureHash: input.securityPostureHash,
-          updatedAt: new Date(),
-        },
-      })
+      .onConflictDoNothing({ target: instanceMetadata.singletonKey })
       .returning();
-    return requireRecord(record, "INSTANCE_METADATA_SYNC_FAILED");
+
+    const record = inserted ?? (await this.getSecurityMetadata());
+    return assertStartupSecurityMetadata(
+      requireRecord(record, "INSTANCE_METADATA_SYNC_FAILED"),
+      input,
+    );
   }
 
   public async getSecurityMetadata(): Promise<InstanceSecurityMetadata | undefined> {
