@@ -19,6 +19,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./packages/workspace-state/migrations/0001_workspace_state.sql:/docker-entrypoint-initdb.d/001_workspace_state.sql:ro
       - ./packages/agents/migrations/0001_agent_tasks.sql:/docker-entrypoint-initdb.d/002_agent_tasks.sql:ro
+      - ./packages/git-artifacts/migrations/0001_git_artifacts.sql:/docker-entrypoint-initdb.d/003_git_artifacts.sql:ro
     security_opt:
       - no-new-privileges:true
 
