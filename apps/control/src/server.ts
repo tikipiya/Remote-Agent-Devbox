@@ -20,6 +20,7 @@ import type {
 
 import type { DockerSandboxSupervisor } from "./workspace/docker-supervisor.js";
 import type { TaskService } from "./tasks/task-service.js";
+import type { ArtifactService } from "./artifacts/artifact-service.js";
 
 export interface ControlServices {
   config: RuntimeConfig;
@@ -28,6 +29,7 @@ export interface ControlServices {
   reconciler: Pick<WorkspaceReconciler, "reconcile" | "reconcileAll">;
   supervisor: Pick<DockerSandboxSupervisor, "getIdeUrl">;
   taskService: Pick<TaskService, "run" | "get">;
+  artifactService: Pick<ArtifactService, "capture" | "get">;
 }
 
 const repositoryBodySchema = z.object({
@@ -134,6 +136,21 @@ export function createControlServer(services: ControlServices): FastifyInstance 
     const task = await services.taskService.get(id);
     if (!task) throw new RadError("TASK_NOT_FOUND", `Task ${id} not found`);
     return task;
+  });
+
+  server.post("/api/workspaces/:id/artifacts", async (request, reply) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const artifact = await services.artifactService.capture(id);
+    return reply.status(201).send(artifact);
+  });
+
+  server.get("/api/artifacts/:id", async (request) => {
+    const { id } = idParamsSchema.parse(request.params);
+    const artifact = await services.artifactService.get(id);
+    if (!artifact) {
+      throw new RadError("ARTIFACT_NOT_FOUND", `Artifact ${id} not found`);
+    }
+    return artifact;
   });
 
   return server;

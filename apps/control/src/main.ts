@@ -1,5 +1,6 @@
 import { loadRuntimeConfig } from "@rad/shared";
 import { PostgresAgentTaskRepository } from "@rad/agents";
+import { PostgresGitArtifactRepository } from "@rad/git-artifacts";
 import {
   PostgresWorkspaceRepository,
   WorkspaceCoordinator,
@@ -12,6 +13,8 @@ import { ExecFileCommandRunner } from "./workspace/command-runner.js";
 import { DockerSandboxSupervisor } from "./workspace/docker-supervisor.js";
 import { TaskService } from "./tasks/task-service.js";
 import { startDiscordBot } from "./discord/bot.js";
+import { ArtifactService } from "./artifacts/artifact-service.js";
+import { ArtifactStore } from "./artifacts/artifact-store.js";
 
 const config = loadRuntimeConfig();
 const { db, pool } = createDatabase(config.RAD_DATABASE_URL);
@@ -28,6 +31,17 @@ const taskService = new TaskService(
   repository,
   supervisor,
 );
+const artifactStore = new ArtifactStore(
+  config.RAD_ARTIFACT_ROOT,
+  config.RAD_ARTIFACT_MAX_BYTES,
+);
+await artifactStore.initialize();
+const artifactService = new ArtifactService(
+  new PostgresGitArtifactRepository(db),
+  repository,
+  supervisor,
+  artifactStore,
+);
 const server = createControlServer({
   config,
   repository,
@@ -35,6 +49,7 @@ const server = createControlServer({
   reconciler,
   coordinator,
   taskService,
+  artifactService,
 });
 
 const reconcileTimer = setInterval(() => {
