@@ -50,8 +50,11 @@ jobs:
         with:
           context: .
           file: images/validator/Dockerfile
+          load: true
           push: false
           tags: remote-agent-devbox-validator:ci
+      - name: Verify networkless validator boundary
+        run: npm run verify:validator
       - name: Verify Codex identity boundary
         run: >-
           docker run --rm --entrypoint node
