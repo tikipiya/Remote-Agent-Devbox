@@ -23,6 +23,15 @@ App installation tokens are repository-scoped and retained only in memory.
 See [Security Gate C](./docs/security/SECURITY_GATE_C.md) for enforced
 properties and the deployment verification requirement.
 
+Security configuration is versioned operational state. An existing database's
+tier or posture hash is never silently synchronized from environment values.
+Explicit migrations enter maintenance, invalidate old authorization state, and
+increment the monotonic security epoch. Audit rows are append-only for the
+application database role. These controls do not protect against a trusted host
+or PostgreSQL superuser modifying the database directly. See
+[Security Gate D](./docs/security/SECURITY_GATE_D.md) and
+[Deployment tiers](./docs/DEPLOYMENT_TIERS.md).
+
 ## Reporting a vulnerability
 
 Do not open a public issue for an undisclosed vulnerability. Use GitHub's

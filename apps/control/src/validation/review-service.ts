@@ -28,7 +28,7 @@ export class ReviewService {
     private readonly artifacts: Pick<GitArtifactRepository, "get">,
     private readonly reviews: ReviewSnapshotRepository,
     private readonly workspaces: Pick<WorkspaceRepository, "getRepository">,
-    private readonly metadata: InstanceMetadataRepository,
+    private readonly metadata: Pick<InstanceMetadataRepository, "getSecurityMetadata">,
     private readonly validator: ArtifactValidator,
   ) {}
 

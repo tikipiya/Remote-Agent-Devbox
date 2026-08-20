@@ -40,7 +40,7 @@ export class CredentialedGitWriteExecutor implements GitOperationExecutor {
     private readonly issuer: TokenIssuer,
     private readonly writer: GitPushPreparer,
     private readonly pullRequests: PullRequestCreator,
-    private readonly metadata: InstanceMetadataRepository,
+    private readonly metadata: Pick<InstanceMetadataRepository, "getSecurityMetadata">,
     private readonly artifactStore: ArtifactStore,
     private readonly now: () => Date = () => new Date(),
   ) {}
@@ -144,6 +144,7 @@ export class CredentialedGitWriteExecutor implements GitOperationExecutor {
       input.review.validatorProfileDigest !== input.operation.validatorProfileDigest ||
       input.review.securityEpoch !== input.operation.securityEpoch ||
       !metadata ||
+      metadata.maintenanceMode ||
       metadata.securityEpoch !== input.operation.securityEpoch ||
       metadata.deploymentTier !== input.review.deploymentTier ||
       metadata.securityPostureHash !== input.review.securityPostureHash

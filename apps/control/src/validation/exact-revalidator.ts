@@ -12,7 +12,7 @@ import type { ArtifactValidator } from "./review-service.js";
 
 export class ExactRevalidator {
   public constructor(
-    private readonly metadata: InstanceMetadataRepository,
+    private readonly metadata: Pick<InstanceMetadataRepository, "getSecurityMetadata">,
     private readonly validator: ArtifactValidator,
   ) {}
 

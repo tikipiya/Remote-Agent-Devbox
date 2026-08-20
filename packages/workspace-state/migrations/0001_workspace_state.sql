@@ -34,9 +34,15 @@ CREATE TABLE instance_metadata (
     deployment_tier BIGINT NOT NULL,
     security_epoch BIGINT NOT NULL DEFAULT 1,
     security_posture_hash TEXT NOT NULL,
+    maintenance_mode BOOLEAN NOT NULL DEFAULT FALSE,
+    maintenance_reason TEXT,
+    maintenance_started_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT instance_metadata_singleton_check CHECK (singleton_key = 'instance'),
     CONSTRAINT instance_metadata_tier_check CHECK (deployment_tier BETWEEN 1 AND 3),
-    CONSTRAINT instance_metadata_epoch_check CHECK (security_epoch > 0)
+    CONSTRAINT instance_metadata_epoch_check CHECK (security_epoch > 0),
+    CONSTRAINT instance_metadata_maintenance_check CHECK (
+      (maintenance_mode AND maintenance_reason IS NOT NULL AND maintenance_started_at IS NOT NULL)
+      OR (NOT maintenance_mode AND maintenance_reason IS NULL AND maintenance_started_at IS NULL)
+    )
 );
-

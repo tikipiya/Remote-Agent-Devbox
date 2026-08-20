@@ -54,6 +54,29 @@ function testServices(): ControlServices {
       start: unavailable,
       get: unavailable,
     },
+    operationalGuard: {
+      assertAvailable: async () => ({
+        deploymentTier: 1,
+        securityEpoch: 1,
+        securityPostureHash: `sha256:${"a".repeat(64)}`,
+        maintenanceMode: false,
+        maintenanceReason: null,
+        maintenanceStartedAt: null,
+        updatedAt: new Date(),
+      }),
+    },
+    securityMetadata: {
+      getSecurityMetadata: async () => ({
+        deploymentTier: 1,
+        securityEpoch: 1,
+        securityPostureHash: `sha256:${"a".repeat(64)}`,
+        maintenanceMode: false,
+        maintenanceReason: null,
+        maintenanceStartedAt: null,
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+      }),
+    },
+    auditEvents: { listRecent: async () => [] },
   };
 }
 
@@ -63,7 +86,43 @@ describe("control server", () => {
     const response = await server.inject({ method: "GET", url: "/health" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ status: "ok", tier: 1 });
+    expect(response.json()).toEqual({ status: "ok", tier: 1, securityEpoch: 1 });
+    await server.close();
+  });
+
+  it("exposes current security posture and bounded audit reads", async () => {
+    const services = testServices();
+    let requestedLimit = 0;
+    services.auditEvents.listRecent = async (limit) => {
+      requestedLimit = limit;
+      return [];
+    };
+    const server = createControlServer(services);
+
+    const status = await server.inject({ method: "GET", url: "/api/security/status" });
+    expect(status.statusCode).toBe(200);
+    expect(status.json().securityEpoch).toBe(1);
+
+    const audit = await server.inject({ method: "GET", url: "/api/audit-events?limit=12" });
+    expect(audit.statusCode).toBe(200);
+    expect(requestedLimit).toBe(12);
+    await server.close();
+  });
+
+  it("reports maintenance in health without blocking read endpoints", async () => {
+    const services = testServices();
+    services.securityMetadata.getSecurityMetadata = async () => ({
+      deploymentTier: 1,
+      securityEpoch: 8,
+      securityPostureHash: `sha256:${"b".repeat(64)}`,
+      maintenanceMode: true,
+      maintenanceReason: "security-migration:test",
+      maintenanceStartedAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const server = createControlServer(services);
+    const response = await server.inject({ method: "GET", url: "/health" });
+    expect(response.json()).toEqual({ status: "maintenance", tier: 1, securityEpoch: 8 });
     await server.close();
   });
 

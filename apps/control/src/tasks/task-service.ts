@@ -5,12 +5,14 @@ import type { AgentTask, AgentTaskRepository } from "@rad/agents";
 import type { WorkspaceRepository } from "@rad/workspace-state";
 
 import type { DockerSandboxSupervisor } from "../workspace/docker-supervisor.js";
+import type { OperationalGuard } from "../security/maintenance-guard.js";
 
 export class TaskService {
   public constructor(
     private readonly tasks: AgentTaskRepository,
     private readonly workspaces: WorkspaceRepository,
     private readonly supervisor: Pick<DockerSandboxSupervisor, "runTask">,
+    private readonly operationalGuard: OperationalGuard,
   ) {}
 
   public async run(
@@ -18,6 +20,7 @@ export class TaskService {
     prompt: string,
     requestedBy: string,
   ): Promise<AgentTask> {
+    await this.operationalGuard.assertAvailable("Agent task start");
     let workspace = await this.requireReadyWorkspace(workspaceId);
     let task = await this.tasks.create({
       id: randomUUID(),
@@ -65,4 +68,3 @@ export class TaskService {
     return workspace;
   }
 }
-

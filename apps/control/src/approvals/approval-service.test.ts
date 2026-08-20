@@ -112,13 +112,24 @@ function createService(
         deploymentTier: snapshot.deploymentTier,
         securityEpoch,
         securityPostureHash: snapshot.securityPostureHash,
+        maintenanceMode: false,
+        maintenanceReason: null,
+        maintenanceStartedAt: null,
         updatedAt: now,
       }),
-      synchronizeSecurityMetadata: async () => {
-        throw new Error("not used");
-      },
     },
     3_600,
+    {
+      assertAvailable: async () => ({
+        deploymentTier: snapshot.deploymentTier,
+        securityEpoch,
+        securityPostureHash: snapshot.securityPostureHash,
+        maintenanceMode: false,
+        maintenanceReason: null,
+        maintenanceStartedAt: null,
+        updatedAt: now,
+      }),
+    },
     () => now,
   );
 }

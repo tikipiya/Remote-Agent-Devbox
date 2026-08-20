@@ -21,6 +21,18 @@ import type {
 
 import { TaskService } from "./task-service.js";
 
+const availableGuard = {
+  assertAvailable: async () => ({
+    deploymentTier: 1,
+    securityEpoch: 1,
+    securityPostureHash: `sha256:${"a".repeat(64)}`,
+    maintenanceMode: false,
+    maintenanceReason: null,
+    maintenanceStartedAt: null,
+    updatedAt: new Date(),
+  }),
+};
+
 class MemoryTasks implements AgentTaskRepository {
   public task?: AgentTask;
 
@@ -109,7 +121,7 @@ describe("TaskService", () => {
     const workspaces = new MemoryWorkspaces();
     const service = new TaskService(tasks, workspaces, {
       runTask: async () => ({ threadId: "thread", turnId: "turn", message: "done" }),
-    });
+    }, availableGuard);
 
     const task = await service.run(workspaces.workspace.id, "fix it", "test:user");
 
@@ -125,7 +137,7 @@ describe("TaskService", () => {
       runTask: async () => {
         throw new Error("agent unavailable");
       },
-    });
+    }, availableGuard);
 
     await expect(
       service.run(workspaces.workspace.id, "fix it", "test:user"),
@@ -151,4 +163,3 @@ function makeWorkspace(): Workspace {
     lastError: null,
   };
 }
-

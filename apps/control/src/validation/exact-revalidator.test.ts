@@ -103,11 +103,11 @@ function createRevalidator(
         securityEpoch,
         deploymentTier: 1,
         securityPostureHash: structuralManifest.securityPostureHash,
+        maintenanceMode: false,
+        maintenanceReason: null,
+        maintenanceStartedAt: null,
         updatedAt: new Date(),
       }),
-      synchronizeSecurityMetadata: async () => {
-        throw new Error("not used");
-      },
     },
     {
       validate: async () => ({
