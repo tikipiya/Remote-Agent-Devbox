@@ -21,7 +21,6 @@ export const runtimeConfigSchema = z
     RAD_WORKSPACE_PIDS: positiveInteger.min(32).default(256),
     RAD_WORKSPACE_TTL_SECONDS: positiveInteger.min(60).default(14_400),
     RAD_RECONCILE_INTERVAL_MS: positiveInteger.min(250).default(5_000),
-    RAD_WORKSPACE_ROOT: z.string().min(1).default("/workspaces"),
     RAD_DISCORD_TOKEN: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_APPLICATION_ID: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_GUILD_ID: z.string().min(1).optional().or(z.literal("")),

@@ -25,9 +25,9 @@ Requirements: Node.js 22+, Docker with Compose, and PostgreSQL 16+.
 cp .env.example .env
 npm ci
 npm run check
-docker compose up --build
+docker compose --profile build build
+docker compose up
 ```
 
 The HTTP service listens on `127.0.0.1:3000` by default. Discord support is
 disabled unless both Discord environment variables are supplied.
-

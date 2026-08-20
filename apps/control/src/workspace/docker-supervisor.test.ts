@@ -56,7 +56,7 @@ describe("DockerSandboxSupervisor", () => {
       async () => repository,
     );
 
-    const args = supervisor.createArguments(workspace, repository, "/safe/workspace");
+    const args = supervisor.createArguments(workspace, repository);
     const serialized = args.join(" ");
 
     expect(args).toContain("--read-only");
@@ -67,6 +67,7 @@ describe("DockerSandboxSupervisor", () => {
     expect(serialized).not.toMatch(/docker\.sock/i);
     expect(serialized).not.toMatch(/github.*token/i);
     expect(serialized).not.toContain("rad-control");
+    expect(serialized).toContain(`type=volume,source=rad-data-${workspace.id}`);
   });
 
   it("rejects a non-UUID workspace identifier before invoking Docker", async () => {

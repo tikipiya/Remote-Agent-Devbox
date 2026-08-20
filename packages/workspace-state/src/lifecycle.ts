@@ -7,7 +7,7 @@ import {
 
 import type { WorkspaceRepository } from "./repository.js";
 
-export type ActualSandboxState = "ABSENT" | "STOPPED" | "RUNNING";
+export type ActualSandboxState = "ABSENT" | "STOPPED" | "STARTING" | "RUNNING";
 
 export interface SandboxSupervisor {
   inspect(workspace: Workspace): Promise<ActualSandboxState>;
@@ -142,4 +142,3 @@ export class WorkspaceCoordinator {
     return this.reconciler.reconcile(workspace.id);
   }
 }
-

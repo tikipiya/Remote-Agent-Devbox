@@ -1,5 +1,3 @@
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
 import { Buffer } from "node:buffer";
 
 import {
@@ -39,8 +37,18 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
         "{{json .State}}",
         containerName(workspace.id),
       ]);
-      const state = JSON.parse(result.stdout) as { Running?: boolean };
-      return state.Running === true ? "RUNNING" : "STOPPED";
+      const state = JSON.parse(result.stdout) as {
+        Running?: boolean;
+        Health?: { Status?: string };
+      };
+      if (state.Running !== true) return "STOPPED";
+      if (state.Health?.Status === "unhealthy") {
+        throw new RadError(
+          "WORKSPACE_UNHEALTHY",
+          `Workspace ${workspace.id} failed its health check`,
+        );
+      }
+      return state.Health?.Status === "starting" ? "STARTING" : "RUNNING";
     } catch (error) {
       if (isMissingContainer(error)) return "ABSENT";
       throw error;
@@ -58,21 +66,24 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
       );
     }
 
-    const workspacePath = join(this.config.RAD_WORKSPACE_ROOT, workspace.id);
-    await mkdir(workspacePath, { recursive: true, mode: 0o700 });
-    await this.docker(this.createArguments(workspace, repository, workspacePath));
+    await this.ensureWorkspaceNetwork();
+    await this.docker(["volume", "create", volumeName(workspace.id)]);
+    await this.docker(this.createArguments(workspace, repository));
   }
 
   public async ensureRunning(workspace: Workspace): Promise<void> {
     const actual = await this.inspect(workspace);
     if (actual === "RUNNING") return;
     if (actual === "ABSENT") await this.ensureCreated(workspace);
-    await this.docker(["container", "start", containerName(workspace.id)]);
+    if (actual !== "STARTING") {
+      await this.docker(["container", "start", containerName(workspace.id)]);
+    }
+    await this.waitUntilHealthy(workspace);
   }
 
   public async ensureStopped(workspace: Workspace): Promise<void> {
     const actual = await this.inspect(workspace);
-    if (actual !== "RUNNING") return;
+    if (actual === "ABSENT" || actual === "STOPPED") return;
     await this.docker([
       "container",
       "stop",
@@ -83,8 +94,14 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
   }
 
   public async ensureDestroyed(workspace: Workspace): Promise<void> {
-    if ((await this.inspect(workspace)) === "ABSENT") return;
-    await this.docker(["container", "rm", "--force", containerName(workspace.id)]);
+    if ((await this.inspect(workspace)) !== "ABSENT") {
+      await this.docker(["container", "rm", "--force", containerName(workspace.id)]);
+    }
+    try {
+      await this.docker(["volume", "rm", volumeName(workspace.id)]);
+    } catch (error) {
+      if (!isMissingVolume(error)) throw error;
+    }
   }
 
   public async getIdeUrl(workspace: Workspace): Promise<string | undefined> {
@@ -146,7 +163,6 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
   public createArguments(
     workspace: Workspace,
     repository: Repository,
-    workspacePath: string,
   ): string[] {
     return [
       "container",
@@ -177,9 +193,11 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
       "--tmpfs",
       "/home/codex/.config:rw,nosuid,nodev,size=64m,uid=10001,gid=10001",
       "--tmpfs",
+      "/home/codex/.cache:rw,nosuid,nodev,size=256m,uid=10001,gid=10001",
+      "--tmpfs",
       "/home/codex/.codex:rw,nosuid,nodev,size=64m,uid=10001,gid=10001",
       "--mount",
-      `type=bind,source=${workspacePath},target=/workspace`,
+      `type=volume,source=${volumeName(workspace.id)},target=/workspace`,
       "--publish",
       "127.0.0.1::3000",
       "--env",
@@ -197,6 +215,45 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
   private docker(args: readonly string[]): Promise<{ stdout: string; stderr: string }> {
     return this.commandRunner.run("docker", args);
   }
+
+  private async waitUntilHealthy(workspace: Workspace): Promise<void> {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const actual = await this.inspect(workspace);
+      if (actual === "RUNNING") return;
+      if (actual === "STOPPED" || actual === "ABSENT") {
+        throw new RadError(
+          "WORKSPACE_START_FAILED",
+          `Workspace ${workspace.id} stopped during startup`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
+    throw new RadError(
+      "WORKSPACE_START_TIMEOUT",
+      `Workspace ${workspace.id} did not become healthy`,
+    );
+  }
+
+  private async ensureWorkspaceNetwork(): Promise<void> {
+    try {
+      await this.docker(["network", "inspect", this.config.RAD_WORKSPACE_NETWORK]);
+    } catch (error) {
+      if (!isMissingNetwork(error)) throw error;
+      try {
+        await this.docker([
+          "network",
+          "create",
+          "--driver",
+          "bridge",
+          "--label",
+          "dev.rad.network=workspace",
+          this.config.RAD_WORKSPACE_NETWORK,
+        ]);
+      } catch (createError) {
+        if (!/already exists/i.test(String(createError))) throw createError;
+      }
+    }
+  }
 }
 
 function containerName(workspaceId: string): string {
@@ -210,8 +267,25 @@ function containerName(workspaceId: string): string {
   return `rad-ws-${workspaceId}`;
 }
 
+function volumeName(workspaceId: string): string {
+  containerName(workspaceId);
+  return `rad-data-${workspaceId}`;
+}
+
 function isMissingContainer(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const stderr = "stderr" in error ? String(error.stderr) : "";
   return /No such (object|container)/i.test(`${error.message}\n${stderr}`);
+}
+
+function isMissingVolume(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const stderr = "stderr" in error ? String(error.stderr) : "";
+  return /no such volume/i.test(`${error.message}\n${stderr}`);
+}
+
+function isMissingNetwork(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const stderr = "stderr" in error ? String(error.stderr) : "";
+  return /network .* not found|no such network/i.test(`${error.message}\n${stderr}`);
 }
