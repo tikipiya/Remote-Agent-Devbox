@@ -74,9 +74,95 @@ describe("CodexAppServerClient", () => {
       error: { code: -32_601 },
     });
   });
+
+  it("connects a remote exec environment and scopes the task to it", async () => {
+    const fromServer = new PassThrough();
+    const toServer = new PassThrough();
+    const sent: Array<{ id?: number; method?: string; params?: unknown }> = [];
+    toServer.setEncoding("utf8");
+    toServer.on("data", (chunk: string) => {
+      for (const line of chunk.trim().split("\n")) sent.push(JSON.parse(line));
+    });
+    const client = new CodexAppServerClient({
+      input: fromServer,
+      output: toServer,
+      requestTimeoutMs: 1_000,
+      turnTimeoutMs: 1_000,
+    });
+
+    const initialized = client.initialize();
+    await respond(fromServer, 1, { userAgent: "test" });
+    await initialized;
+
+    const environment = {
+      environmentId: "workspace-1",
+      execServerUrl: "ws://127.0.0.1:4500",
+    };
+    const connected = client.connectEnvironment(environment);
+    await respond(fromServer, 2, {});
+    await respond(fromServer, 3, { status: "ready" });
+    await connected;
+
+    const resultPromise = client.runTask(
+      "fix the test",
+      "/workspace/repository",
+      environment,
+    );
+    await respond(fromServer, 4, { thread: { id: "thread-1" } });
+    await respond(fromServer, 5, { turn: { id: "turn-1" } });
+    fromServer.write(
+      `${JSON.stringify({ method: "turn/completed", params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed", error: null } } })}\n`,
+    );
+    await resultPromise;
+
+    expect(sent.find((message) => message.method === "environment/add")?.params)
+      .toEqual({
+        environmentId: "workspace-1",
+        execServerUrl: "ws://127.0.0.1:4500",
+        connectTimeoutMs: 1_000,
+      });
+    const expectedEnvironment = [{
+      environmentId: "workspace-1",
+      cwd: "/workspace/repository",
+      runtimeWorkspaceRoots: ["/workspace/repository"],
+    }];
+    expect(sent.find((message) => message.method === "thread/start")?.params)
+      .toMatchObject({ environments: expectedEnvironment });
+    expect(sent.find((message) => message.method === "turn/start")?.params)
+      .toMatchObject({ environments: expectedEnvironment });
+  });
+
+  it("fails closed when a remote exec environment is not ready", async () => {
+    const fromServer = new PassThrough();
+    const toServer = new PassThrough();
+    const client = new CodexAppServerClient({
+      input: fromServer,
+      output: toServer,
+      requestTimeoutMs: 1_000,
+    });
+    const connected = client.connectEnvironment({
+      environmentId: "workspace-1",
+      execServerUrl: "ws://127.0.0.1:4500",
+    });
+    await respond(fromServer, 1, {});
+    await respond(fromServer, 2, {
+      status: "disconnected",
+      error: "connection refused",
+    });
+
+    await expect(connected).rejects.toThrow(/connection refused/);
+  });
 });
 
 async function tick(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+async function respond(
+  stream: PassThrough,
+  id: number,
+  result: unknown,
+): Promise<void> {
+  await tick();
+  stream.write(`${JSON.stringify({ id, result })}\n`);
+}
