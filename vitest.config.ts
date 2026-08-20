@@ -8,6 +8,9 @@ export default defineConfig({
       "@rad/shared": fileURLToPath(
         new URL("./packages/shared/src/index.ts", import.meta.url),
       ),
+      "@rad/agents": fileURLToPath(
+        new URL("./packages/agents/src/index.ts", import.meta.url),
+      ),
       "@rad/workspace-state": fileURLToPath(
         new URL("./packages/workspace-state/src/index.ts", import.meta.url),
       ),

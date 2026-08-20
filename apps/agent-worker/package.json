@@ -1,0 +1,19 @@
+{
+  "name": "@rad/agent-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "rad-agent-worker": "dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@rad/agents": "0.0.0",
+    "zod": "4.4.3"
+  }
+}
+
