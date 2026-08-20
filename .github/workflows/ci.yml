@@ -45,6 +45,13 @@ jobs:
           load: true
           push: false
           tags: remote-agent-devbox-workspace-node:ci
+      - name: Build validator image
+        uses: docker/build-push-action@v6.18.0
+        with:
+          context: .
+          file: images/validator/Dockerfile
+          push: false
+          tags: remote-agent-devbox-validator:ci
       - name: Verify Codex identity boundary
         run: >-
           docker run --rm --entrypoint node
