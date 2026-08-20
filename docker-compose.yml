@@ -21,6 +21,7 @@ services:
       - ./packages/agents/migrations/0001_agent_tasks.sql:/docker-entrypoint-initdb.d/002_agent_tasks.sql:ro
       - ./packages/git-artifacts/migrations/0001_git_artifacts.sql:/docker-entrypoint-initdb.d/003_git_artifacts.sql:ro
       - ./packages/git-artifacts/migrations/0002_review_snapshots.sql:/docker-entrypoint-initdb.d/004_review_snapshots.sql:ro
+      - ./packages/approvals/migrations/0001_approval_requests.sql:/docker-entrypoint-initdb.d/005_approval_requests.sql:ro
     security_opt:
       - no-new-privileges:true
 
