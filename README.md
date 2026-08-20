@@ -1,5 +1,7 @@
 # Remote Agent Devbox
 
+[日本語版](./README.ja.md)
+
 Remote Agent Devbox is a self-hosted runtime for running AI coding agents in
 isolated, disposable workspaces. The v0.9 architecture in [PLAN.md](./PLAN.md)
 is the source of truth.
