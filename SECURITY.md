@@ -1,5 +1,7 @@
 # Security policy
 
+[日本語版](./SECURITY.ja.md)
+
 ## Supported security tier
 
 The initial implementation targets Tier 1 (Secure Personal / Small Team). It
