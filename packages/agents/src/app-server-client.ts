@@ -95,7 +95,7 @@ export class CodexAppServerClient {
         version: "0.0.0",
       },
       capabilities: {
-        experimentalApi: false,
+        experimentalApi: true,
         requestAttestation: false,
       },
     });
@@ -110,17 +110,26 @@ export class CodexAppServerClient {
       execServerUrl: environment.execServerUrl,
       connectTimeoutMs: this.requestTimeoutMs,
     });
-    const status = await this.request<EnvironmentStatusResult>(
-      "environment/status",
-      { environmentId: environment.environmentId },
-    );
-    if (status.status !== "ready") {
-      throw new RadError(
-        "CODEX_ENVIRONMENT_NOT_READY",
-        status.error ??
-          `Codex environment ${environment.environmentId} is ${status.status}`,
+    const deadline = Date.now() + this.requestTimeoutMs;
+    while (Date.now() < deadline) {
+      const status = await this.request<EnvironmentStatusResult>(
+        "environment/status",
+        { environmentId: environment.environmentId },
       );
+      if (status.status === "ready") return;
+      if (status.status !== "pending") {
+        throw new RadError(
+          "CODEX_ENVIRONMENT_NOT_READY",
+          status.error ??
+            `Codex environment ${environment.environmentId} is ${status.status}`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
+    throw new RadError(
+      "CODEX_ENVIRONMENT_NOT_READY",
+      `Codex environment ${environment.environmentId} did not become ready`,
+    );
   }
 
   public async runTask(

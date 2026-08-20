@@ -46,6 +46,12 @@ describe("CodexAppServerClient", () => {
       turnId: "turn-1",
       message: "done",
     });
+    const initialize = sent.find(
+      (message) => (message as { method?: string }).method === "initialize",
+    ) as { params: Record<string, unknown> };
+    expect(initialize.params).toMatchObject({
+      capabilities: { experimentalApi: true, requestAttestation: false },
+    });
     const threadStart = sent.find(
       (message) => (message as { method?: string }).method === "thread/start",
     ) as { params: Record<string, unknown> };
@@ -100,7 +106,9 @@ describe("CodexAppServerClient", () => {
     };
     const connected = client.connectEnvironment(environment);
     await respond(fromServer, 2, {});
-    await respond(fromServer, 3, { status: "ready" });
+    await respond(fromServer, 3, { status: "pending" });
+    await new Promise((resolve) => setTimeout(resolve, 110));
+    await respond(fromServer, 4, { status: "ready" });
     await connected;
 
     const resultPromise = client.runTask(
@@ -108,8 +116,8 @@ describe("CodexAppServerClient", () => {
       "/workspace/repository",
       environment,
     );
-    await respond(fromServer, 4, { thread: { id: "thread-1" } });
-    await respond(fromServer, 5, { turn: { id: "turn-1" } });
+    await respond(fromServer, 5, { thread: { id: "thread-1" } });
+    await respond(fromServer, 6, { turn: { id: "turn-1" } });
     fromServer.write(
       `${JSON.stringify({ method: "turn/completed", params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed", error: null } } })}\n`,
     );

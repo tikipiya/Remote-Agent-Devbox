@@ -18,7 +18,8 @@
     "dev": "npm run dev --workspace=@rad/control",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -b --pretty false"
+    "typecheck": "tsc -b --pretty false",
+    "verify:codex-boundary": "npm run build && node scripts/verify-codex-exec-boundary.mjs"
   },
   "devDependencies": {
     "@types/node": "26.2.0",
