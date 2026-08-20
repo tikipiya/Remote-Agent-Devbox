@@ -2,20 +2,41 @@
 
 ## Local Tier 1 startup
 
-1. Install Node.js 22.15+, Rootless Docker, and Docker Compose.
+1. Install Node.js 22.15+, Rootless Docker Engine 26+, and Docker Compose.
 2. Copy `.env.example` to `.env`, replace the PostgreSQL password, and set a
    dedicated OpenAI project key as `RAD_CODEX_API_KEY`.
 3. Keep Discord variables empty unless a bot application is ready.
-4. Build and start:
+4. Build the images:
 
 ```bash
 npm ci --ignore-scripts
 npm run check
 docker compose --profile build build
+```
+
+5. Resolve the validator image ID and copy the complete `sha256:...` value to
+   `RAD_VALIDATOR_IMAGE_DIGEST` in `.env`:
+
+```bash
+docker image inspect --format '{{.Id}}' remote-agent-devbox-validator:local
+```
+
+6. Start the services:
+
+```bash
 docker compose up -d
 ```
 
 Open `http://127.0.0.1:3000`.
+
+Validation fails closed if the configured ID is absent or no longer matches
+the local image. Re-resolve and explicitly update it after rebuilding the
+validator. Run the standalone boundary check with a built image tagged
+`remote-agent-devbox-validator:ci`:
+
+```bash
+npm run verify:validator
+```
 
 ## Codex identity
 

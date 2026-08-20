@@ -74,5 +74,5 @@ image so an upgrade requires an explicit code and schema review.
   for local Tier 1 deployment. One-time IDE URLs are Milestone 4 hardening.
 - Database migrations are applied by PostgreSQL init scripts for a fresh
   volume. Upgrade migrations for existing installations are not implemented.
-- Transactional outbox, artifact review, approval, and Git write are later
-  milestones and are intentionally absent.
+- Transactional outbox, approval, and Git write are later milestones. Artifact
+  review is implemented by the Milestone 1 immutable review pipeline.
