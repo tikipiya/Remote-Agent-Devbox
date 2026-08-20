@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 const positiveInteger = z.coerce.number().int().positive();
+const optionalPositiveInteger = z.preprocess(
+  (value) => (value === "" || value === undefined ? undefined : value),
+  z.coerce.number().int().positive().optional(),
+);
 
 export const runtimeConfigSchema = z
   .object({
@@ -37,6 +41,10 @@ export const runtimeConfigSchema = z
     RAD_VALIDATOR_PIDS: positiveInteger.min(16).max(512).default(64),
     RAD_VALIDATOR_TIMEOUT_MS: positiveInteger.min(1_000).max(600_000).default(120_000),
     RAD_APPROVAL_TTL_SECONDS: positiveInteger.min(60).max(86_400).default(3_600),
+    RAD_GITHUB_API_URL: z.url().refine((url) => url.startsWith("https://")).default("https://api.github.com"),
+    RAD_GITHUB_APP_ID: z.string().regex(/^\d+$/).optional().or(z.literal("")),
+    RAD_GITHUB_INSTALLATION_ID: optionalPositiveInteger,
+    RAD_GITHUB_PRIVATE_KEY_BASE64: z.string().min(1).optional().or(z.literal("")),
     RAD_CODEX_API_KEY: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_TOKEN: z.string().min(1).optional().or(z.literal("")),
     RAD_DISCORD_APPLICATION_ID: z.string().min(1).optional().or(z.literal("")),
@@ -58,6 +66,19 @@ export const runtimeConfigSchema = z
         code: "custom",
         message: "Discord token and application ID must be configured together",
         path: ["RAD_DISCORD_TOKEN"],
+      });
+    }
+
+    const githubValues = [
+      Boolean(config.RAD_GITHUB_APP_ID),
+      Boolean(config.RAD_GITHUB_INSTALLATION_ID),
+      Boolean(config.RAD_GITHUB_PRIVATE_KEY_BASE64),
+    ];
+    if (githubValues.some(Boolean) && !githubValues.every(Boolean)) {
+      context.addIssue({
+        code: "custom",
+        message: "GitHub App ID, installation ID, and private key must be configured together",
+        path: ["RAD_GITHUB_APP_ID"],
       });
     }
   });

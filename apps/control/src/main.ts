@@ -53,6 +53,10 @@ await repository.synchronizeSecurityMetadata({
     validatorPids: config.RAD_VALIDATOR_PIDS,
     validatorTimeoutMilliseconds: config.RAD_VALIDATOR_TIMEOUT_MS,
     approvalTtlSeconds: config.RAD_APPROVAL_TTL_SECONDS,
+    githubApiUrl: config.RAD_GITHUB_API_URL,
+    githubAppId: config.RAD_GITHUB_APP_ID || null,
+    githubInstallationId: config.RAD_GITHUB_INSTALLATION_ID ?? null,
+    githubPrivateKeyConfigured: Boolean(config.RAD_GITHUB_PRIVATE_KEY_BASE64),
   }),
 });
 const commandRunner = new ExecFileCommandRunner();

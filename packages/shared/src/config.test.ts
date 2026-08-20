@@ -48,6 +48,20 @@ describe("loadRuntimeConfig", () => {
     ).toThrow(/configured together/);
   });
 
+  it("requires GitHub App credentials as one complete set", () => {
+    expect(() =>
+      loadRuntimeConfig({ ...validEnvironment, RAD_GITHUB_APP_ID: "123" }),
+    ).toThrow(/configured together/);
+    expect(
+      loadRuntimeConfig({
+        ...validEnvironment,
+        RAD_GITHUB_APP_ID: "123",
+        RAD_GITHUB_INSTALLATION_ID: "456",
+        RAD_GITHUB_PRIVATE_KEY_BASE64: "cGVt",
+      }).RAD_GITHUB_INSTALLATION_ID,
+    ).toBe(456);
+  });
+
   it("allows startup without Codex identity but retains one when configured", () => {
     expect(loadRuntimeConfig(validEnvironment).RAD_CODEX_API_KEY).toBeUndefined();
     expect(
