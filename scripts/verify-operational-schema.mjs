@@ -59,6 +59,24 @@ try {
   `);
   if (ideSecretColumnCount !== "2") throw new Error("IDE access digest columns are incomplete");
 
+  const idePlaintextColumnCount = await psql(`
+    SELECT COUNT(*) FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name IN ('ide_access_codes', 'ide_access_sessions')
+      AND column_name IN ('code', 'session_token', 'access_token')
+  `);
+  if (idePlaintextColumnCount !== "0") throw new Error("IDE authority plaintext columns exist");
+
+  const ideConstraintCount = await psql(`
+    SELECT COUNT(*) FROM pg_constraint
+    WHERE conname IN (
+      'ide_access_codes_digest_check',
+      'ide_access_codes_terminal_check',
+      'ide_access_sessions_digest_check'
+    )
+  `);
+  if (ideConstraintCount !== "3") throw new Error("IDE access constraints are incomplete");
+
   const postureColumnCount = await psql(`
     SELECT COUNT(*) FROM information_schema.columns
     WHERE table_schema = 'public'

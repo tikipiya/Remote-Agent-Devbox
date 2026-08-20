@@ -53,8 +53,11 @@ jobs:
         with:
           context: .
           file: images/ide-proxy/Dockerfile
+          load: true
           push: false
           tags: remote-agent-devbox-ide-proxy:ci
+      - name: Verify one-time IDE proxy boundary
+        run: npm run verify:ide-proxy
       - name: Build validator image
         uses: docker/build-push-action@v6.18.0
         with:
