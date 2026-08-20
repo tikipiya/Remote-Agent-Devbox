@@ -293,18 +293,13 @@ export class PostgresCredentialLeaseRepository implements CredentialLeaseReposit
   }
 
   public markFailed(id: string, failedAt: Date, reason: string): Promise<CredentialLease> {
-    return this.transition(id, ["RESERVED"], "FAILED", {
-      issuedAt: failedAt,
-      expiresAt: failedAt,
-      failureReason: reason,
-    });
+    void failedAt;
+    return this.transition(id, ["RESERVED"], "FAILED", { failureReason: reason });
   }
 
   public markUncertain(id: string, observedAt: Date, reason: string): Promise<CredentialLease> {
-    return this.transition(id, ["ISSUED"], "UNCERTAIN", {
-      consumedAt: observedAt,
-      failureReason: reason,
-    });
+    void observedAt;
+    return this.transition(id, ["ISSUED"], "UNCERTAIN", { failureReason: reason });
   }
 
   private async transition(

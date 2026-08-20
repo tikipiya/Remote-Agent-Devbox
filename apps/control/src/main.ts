@@ -1,7 +1,11 @@
 import { loadRuntimeConfig } from "@rad/shared";
 import { PostgresAgentTaskRepository } from "@rad/agents";
 import { PostgresApprovalRepository } from "@rad/approvals";
-import { PostgresGitOperationRepository } from "@rad/git-operations";
+import {
+  PostgresCredentialLeaseRepository,
+  PostgresGitOperationRepository,
+} from "@rad/git-operations";
+import { GitHubAppTokenIssuer } from "@rad/github-token-issuer";
 import {
   PostgresGitArtifactRepository,
   PostgresReviewSnapshotRepository,
@@ -27,6 +31,9 @@ import { ApprovalService } from "./approvals/approval-service.js";
 import { ExactRevalidator } from "./validation/exact-revalidator.js";
 import { GitOperationService } from "./git/git-operation-service.js";
 import { GitRemoteHeadObserver } from "./git/remote-head-observer.js";
+import { CredentialedGitWriteExecutor } from "./git/git-write-executor.js";
+import { TrustedGitWriter } from "./git/git-writer.js";
+import { GitHubPullRequestCreator } from "./git/github-pull-request.js";
 
 const config = loadRuntimeConfig();
 const { db, pool } = createDatabase(config.RAD_DATABASE_URL);
@@ -81,6 +88,7 @@ const artifactRepository = new PostgresGitArtifactRepository(db);
 const reviewRepository = new PostgresReviewSnapshotRepository(db);
 const approvalRepository = new PostgresApprovalRepository(db);
 const operationRepository = new PostgresGitOperationRepository(db);
+const credentialLeaseRepository = new PostgresCredentialLeaseRepository(db);
 const artifactService = new ArtifactService(
   artifactRepository,
   repository,
@@ -110,6 +118,16 @@ const gitOperationService = new GitOperationService(
   new ExactRevalidator(
     repository,
     new DockerValidatorLauncher(config, commandRunner),
+  ),
+  new CredentialedGitWriteExecutor(
+    config,
+    operationRepository,
+    credentialLeaseRepository,
+    new GitHubAppTokenIssuer(config, repository),
+    new TrustedGitWriter(commandRunner),
+    new GitHubPullRequestCreator(config.RAD_GITHUB_API_URL),
+    repository,
+    artifactStore,
   ),
 );
 const server = createControlServer({

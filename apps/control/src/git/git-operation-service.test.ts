@@ -156,6 +156,10 @@ function createService(
       },
     },
     revalidator,
+    {
+      assertReady: () => undefined,
+      execute: async ({ operation }) => operation,
+    },
     () => now,
   );
 }

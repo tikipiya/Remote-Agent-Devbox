@@ -52,8 +52,8 @@ CREATE TABLE IF NOT EXISTS credential_leases (
   failure_reason TEXT,
   created_at TIMESTAMPTZ NOT NULL,
   CONSTRAINT credential_leases_issue_check CHECK (
-    (state = 'RESERVED' AND issued_at IS NULL AND expires_at IS NULL)
-    OR (state <> 'RESERVED' AND issued_at IS NOT NULL)
+    (state IN ('RESERVED', 'FAILED') AND issued_at IS NULL AND expires_at IS NULL)
+    OR (state IN ('ISSUED', 'CONSUMED', 'EXPIRED', 'UNCERTAIN') AND issued_at IS NOT NULL)
   )
 );
 

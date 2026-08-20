@@ -11,6 +11,7 @@
     { "path": "../../packages/approvals" },
     { "path": "../../packages/git-artifacts" },
     { "path": "../../packages/git-operations" },
+    { "path": "../../packages/github-token-issuer" },
     { "path": "../../packages/workspace-state" }
   ],
   "include": ["src/**/*.ts"]

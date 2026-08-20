@@ -8,6 +8,7 @@ import type { WorkspaceRepository } from "@rad/workspace-state";
 
 import type { ExactRevalidator } from "../validation/exact-revalidator.js";
 import type { RemoteHeadObserver } from "./remote-head-observer.js";
+import type { GitOperationExecutor } from "./git-write-executor.js";
 
 export class GitOperationService {
   public constructor(
@@ -18,6 +19,7 @@ export class GitOperationService {
     private readonly operations: GitOperationRepository,
     private readonly remoteHeads: RemoteHeadObserver,
     private readonly revalidator: Pick<ExactRevalidator, "revalidate">,
+    private readonly executor: GitOperationExecutor,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -51,6 +53,7 @@ export class GitOperationService {
 
     let operation = await this.operations.findByApproval(approval.id);
     if (!operation) {
+      this.executor.assertReady();
       const expectedRemoteHead = await this.remoteHeads.observe(
         repository.remoteUrl,
         workspace.branchName,
@@ -76,28 +79,30 @@ export class GitOperationService {
         startedAt: this.now(),
       });
     }
-    if (operation.state !== "VALIDATING") return operation;
-
-    try {
-      this.requireApprovalStillUsable(approval, review);
-      await this.revalidator.revalidate(review, artifact, repository.defaultBranch);
-      return await this.operations.transition(
-        operation.id,
-        "VALIDATING",
-        "WAITING_CREDENTIAL",
-      );
-    } catch (error) {
-      const code = error instanceof RadError ? error.code : "FINAL_REVALIDATION_FAILED";
-      const stale = code.startsWith("FINAL_") && code.endsWith("MISMATCH");
-      return await this.operations.transition(
-        operation.id,
-        "VALIDATING",
-        stale ? "STALE" : "FAILED",
-        stale
-          ? { staleReason: code, completedAt: this.now() }
-          : { errorCode: code, errorMessage: "Final revalidation failed", completedAt: this.now() },
-      );
+    if (operation.state === "VALIDATING") {
+      try {
+        this.requireApprovalStillUsable(approval, review);
+        await this.revalidator.revalidate(review, artifact, repository.defaultBranch);
+        operation = await this.operations.transition(
+          operation.id,
+          "VALIDATING",
+          "WAITING_CREDENTIAL",
+        );
+      } catch (error) {
+        const code = error instanceof RadError ? error.code : "FINAL_REVALIDATION_FAILED";
+        const stale = code.startsWith("FINAL_") && code.endsWith("MISMATCH");
+        return await this.operations.transition(
+          operation.id,
+          "VALIDATING",
+          stale ? "STALE" : "FAILED",
+          stale
+            ? { staleReason: code, completedAt: this.now() }
+            : { errorCode: code, errorMessage: "Final revalidation failed", completedAt: this.now() },
+        );
+      }
     }
+    if (operation.state !== "WAITING_CREDENTIAL") return operation;
+    return this.executor.execute({ operation, approval, review, artifact, repository });
   }
 
   public get(id: string): Promise<GitOperation | undefined> {
