@@ -3,7 +3,7 @@ import type { RuntimeConfig } from "@rad/shared";
 
 export function buildSecurityPostureHash(config: RuntimeConfig): Sha256Digest {
   return digestCanonical({
-    schemaVersion: "tier1-security-posture-1",
+    schemaVersion: "tier1-security-posture-2",
     deploymentTier: config.RAD_DEPLOYMENT_TIER,
     sandboxBackend: config.RAD_SANDBOX_BACKEND,
     workspaceImage: config.RAD_WORKSPACE_IMAGE,
@@ -22,6 +22,11 @@ export function buildSecurityPostureHash(config: RuntimeConfig): Sha256Digest {
     validatorPids: config.RAD_VALIDATOR_PIDS,
     validatorTimeoutMilliseconds: config.RAD_VALIDATOR_TIMEOUT_MS,
     approvalTtlSeconds: config.RAD_APPROVAL_TTL_SECONDS,
+    ideAccessCodeTtlSeconds: config.RAD_IDE_ACCESS_CODE_TTL_SECONDS,
+    ideSessionTtlSeconds: config.RAD_IDE_SESSION_TTL_SECONDS,
+    ideProxyImage: config.RAD_IDE_PROXY_IMAGE,
+    ideProxyPublicUrl: config.RAD_IDE_PROXY_PUBLIC_URL,
+    ideProxySharedSecretConfigured: Boolean(config.RAD_IDE_PROXY_SHARED_SECRET),
     githubApiUrl: config.RAD_GITHUB_API_URL,
     githubAppId: config.RAD_GITHUB_APP_ID || null,
     githubInstallationId: config.RAD_GITHUB_INSTALLATION_ID ?? null,

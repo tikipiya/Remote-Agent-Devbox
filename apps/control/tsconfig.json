@@ -13,6 +13,7 @@
     { "path": "../../packages/git-artifacts" },
     { "path": "../../packages/git-operations" },
     { "path": "../../packages/github-token-issuer" },
+    { "path": "../../packages/ide-access" },
     { "path": "../../packages/outbox" },
     { "path": "../../packages/workspace-state" }
   ],

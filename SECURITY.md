@@ -18,6 +18,11 @@ Workspace and validation containers are enforced isolation boundaries. A
 workspace must never receive a Docker socket, GitHub write credential, control
 plane credential, or route to the control network.
 
+Workspace code-server ports are not published directly. One-time IDE codes are
+stored only as digests, bound to the current epoch and Workspace state version,
+and exchanged for short-lived sessions through the dedicated trusted IDE Proxy.
+See [Milestone 4 IDE access](./docs/architecture/MILESTONE_4_IDE_ACCESS.md).
+
 The approved Git write path binds an expiry-bounded approval to an immutable
 review and the current security epoch, then repeats exact validation before a
 single compare-and-swap push to the Workspace's dedicated agent branch. GitHub

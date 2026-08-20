@@ -21,6 +21,6 @@
 
 ## デプロイゲート
 
-Gate D を満たすと判断する前に、PostgreSQL をバックアップし、マイグレーション 007 から 009 を適用し、使い捨てのデプロイ環境で Epoch だけの Rotation をリハーサルしてください。古い Approval がその後承認も使用もできないこと、Active な Workspace が `STOPPED` に収束すること、監査イベントが存在すること、サービスがメンテナンスモードを終了することを確認してください。
+Gate D を満たすと判断する前に、PostgreSQL をバックアップし、マイグレーション 007 から 010 を適用し、使い捨てのデプロイ環境で Epoch だけの Rotation をリハーサルしてください。古い Approval がその後承認も使用もできないこと、Active な Workspace が `STOPPED` に収束すること、IDE Code/Session が無効になること、監査イベントが存在すること、サービスがメンテナンスモードを終了することを確認してください。
 
 データベースを Restore した後は毎回、サービスを再開する前に Epoch だけの Rotation を実行してください。古い Approval をそのまま提供し始める Restore は、Gate D を満たしません。

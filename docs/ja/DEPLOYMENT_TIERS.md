@@ -4,7 +4,7 @@
 
 ## 実装済みの Tier
 
-このリリースでは Tier 1（Secure Personal / Small Team）を実装しています。Host、PostgreSQL 管理者、Docker Daemon、`rad-control` プロセスを信頼します。`rad-control` 内部のモジュール境界は監査可能性を向上させますが、プロセス分離境界ではありません。
+このリリースでは Tier 1（Secure Personal / Small Team）を実装しています。Host、PostgreSQL 管理者、Docker Daemon、`rad-control`、専用 IDE Proxy を信頼します。`rad-control` 内部のモジュール境界は監査可能性を向上させますが、プロセス分離境界ではありません。
 
 Tier の値は最低限のセキュリティ契約であり、機能の Toggle ではありません。現在のバイナリが受け入れるのは Tier 1 の設定だけです。Tier 2 と Tier 3 にはこのリリースで未実装のコントロールが必要なため、選択できません。
 
@@ -17,7 +17,7 @@ PostgreSQL には、デプロイ Tier、単調増加するセキュリティ Epo
 - 設定された Tier が保存済み Tier より高い場合：Upgrade の検証が必要です。
 - Tier は同じでも Posture Hash が異なる場合：明示的なマイグレーションが必要です。
 
-明示的なマイグレーションでは、メンテナンスモードへ入り、新しい重要操作をブロックし、いずれかの Git Operation が `PUSHING` の場合は遷移を拒否します。また、Pending/Approved の Approval を Stale にし、未完了の Git Operation をキャンセルし、Active な Credential Lease を無効化し、Active な Workspace を停止し、Epoch を増加させ、追記専用の監査イベントを書き込みます。
+明示的なマイグレーションでは、メンテナンスモードへ入り、新しい重要操作をブロックし、いずれかの Git Operation が `PUSHING` の場合は遷移を拒否します。また、Pending/Approved の Approval を Stale にし、未完了の Git Operation をキャンセルし、Active な Credential Lease と IDE Access を無効化し、Active な Workspace を停止し、Epoch を増加させ、追記専用の監査イベントを書き込みます。
 
 古い Review Snapshot は引き続き読み取れますが、その Epoch と Posture のバインディングにより、マイグレーション後の操作を承認することはできません。既存の Workspace は停止され、新しいコンテキストで明示的に再起動する必要があります。
 

@@ -72,8 +72,8 @@ image so an upgrade requires an explicit code and schema review.
   run. The key is injected only into a short-lived trusted Agent Runner; it is
   never mounted or forwarded to the Workspace. See
   [Codex Identity Boundary](./CODEX_IDENTITY_BOUNDARY.md).
-- The IDE is mapped to host loopback with `--auth none`. It is suitable only
-  for local Tier 1 deployment. One-time IDE URLs are Milestone 4 hardening.
+- IDE access is now mediated by the Milestone 4 one-time access Proxy. The
+  Workspace code-server port is not published directly.
 - Database migrations are applied by PostgreSQL init scripts for a fresh
   volume. Upgrade migrations for existing installations are not implemented.
 - Transactional outbox, approval, and Git write are later milestones. Artifact

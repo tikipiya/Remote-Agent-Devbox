@@ -126,7 +126,7 @@ describe("DockerSandboxSupervisor", () => {
     expect(args).toContain("--pids-limit");
     expect(args).toContain("--cap-drop");
     expect(serialized).toContain("no-new-privileges=true");
-    expect(serialized).toContain("127.0.0.1::3000");
+    expect(args).not.toContain("--publish");
     expect(serialized).not.toMatch(/docker\.sock/i);
     expect(serialized).not.toMatch(/github.*token/i);
     expect(serialized).not.toContain("rad-control");

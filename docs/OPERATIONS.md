@@ -6,7 +6,9 @@
 
 1. Install Node.js 22.15+, Rootless Docker Engine 26+, and Docker Compose.
 2. Copy `.env.example` to `.env`, replace the PostgreSQL password, and set a
-   dedicated OpenAI project key as `RAD_CODEX_API_KEY`.
+   dedicated OpenAI project key as `RAD_CODEX_API_KEY`. Generate an independent
+   IDE Proxy secret with `openssl rand -hex 32` and set it as
+   `RAD_IDE_PROXY_SHARED_SECRET`.
 3. Keep Discord variables empty unless a bot application is ready.
 4. Build the images:
 
@@ -38,6 +40,30 @@ validator. Run the standalone boundary check with a built image tagged
 
 ```bash
 npm run verify:validator
+```
+
+## One-time IDE access
+
+`POST /api/workspaces/:id/ide-access` issues a one-time URL only for a `READY`
+Workspace. The default code lifetime is 60 seconds and the resulting session
+lifetime is 3,600 seconds, bounded by the Workspace expiry. Configure them with
+`RAD_IDE_ACCESS_CODE_TTL_SECONDS` and `RAD_IDE_SESSION_TTL_SECONDS`.
+
+The IDE Proxy is published separately at `RAD_IDE_PROXY_PORT` (default `3001`).
+For a local Tier 1 deployment, keep `RAD_IDE_PROXY_PUBLIC_URL` at
+`http://127.0.0.1:3001`. Remote access requires an operator-managed HTTPS
+endpoint and the matching public URL; do not expose the Workspace code-server
+port directly.
+
+Control and `ide-proxy` must receive the same
+`RAD_IDE_PROXY_SHARED_SECRET`. Rotating it changes the security posture and
+requires the explicit migration workflow below. A missing secret disables IDE
+access rather than falling back to the old unauthenticated direct URL.
+
+Run the container boundary check against the CI-tagged image with:
+
+```bash
+RAD_IDE_PROXY_IMAGE=remote-agent-devbox-ide-proxy:local npm run verify:ide-proxy
 ```
 
 ## GitHub App for approved Git writes
@@ -81,13 +107,14 @@ GitHub App installation. Do not reuse production credentials for CI.
 ## Existing database migrations
 
 PostgreSQL init files run automatically only for an empty data directory. Back
-up an existing database and apply these Milestone 3 files in order before
-starting the new control image:
+up an existing database and apply these files in order before starting the new
+control image:
 
 ```text
 007_operational_posture.sql
 008_audit_events.sql
 009_outbox_commands.sql
+010_ide_access.sql
 ```
 
 The source files and Compose mappings are:
@@ -96,6 +123,7 @@ The source files and Compose mappings are:
 packages/workspace-state/migrations/0002_operational_posture.sql
 packages/audit-events/migrations/0001_audit_events.sql
 packages/outbox/migrations/0001_outbox_commands.sql
+packages/ide-access/migrations/0001_ide_access.sql
 ```
 
 Run them using the database owner configured for `rad-control`. Do not edit
@@ -133,7 +161,8 @@ maintenance reason is rejected.
 
 After success, start `control` and verify `/health` reports `ok` with the new
 epoch. Old approvals must be stale and active Workspaces must converge to
-`STOPPED` before an operator restarts them.
+`STOPPED` before an operator restarts them. Unused IDE codes and active IDE
+sessions must no longer resolve.
 
 ## Backup and restore
 

@@ -144,8 +144,14 @@ export async function provisionWorkspace(
 export const getWorkspace = (id: string): Promise<Workspace> =>
   request(`/api/workspaces/${id}`);
 
-export const getIdeUrl = (id: string): Promise<{ url?: string }> =>
-  request(`/api/workspaces/${id}/ide`);
+export const createIdeAccess = (
+  id: string,
+  requestedBy: string,
+): Promise<{ url: string; expiresAt: string }> =>
+  request(`/api/workspaces/${id}/ide-access`, {
+    method: "POST",
+    body: JSON.stringify({ requestedBy }),
+  });
 
 export const setWorkspaceState = (
   id: string,

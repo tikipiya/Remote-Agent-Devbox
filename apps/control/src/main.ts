@@ -8,6 +8,7 @@ import {
   PostgresGitOperationRepository,
 } from "@rad/git-operations";
 import { GitHubAppTokenIssuer } from "@rad/github-token-issuer";
+import { IdeAccessService, PostgresIdeAccessRepository } from "@rad/ide-access";
 import {
   PostgresGitArtifactRepository,
   PostgresReviewSnapshotRepository,
@@ -36,6 +37,7 @@ import { TrustedGitWriter } from "./git/git-writer.js";
 import { GitHubPullRequestCreator } from "./git/github-pull-request.js";
 import { MaintenanceModeGuard } from "./security/maintenance-guard.js";
 import { buildSecurityPostureHash } from "./security/security-posture.js";
+import { AuditedIdeAccessService } from "./ide/ide-access-service.js";
 import {
   OutboxWorkspaceCoordinator,
   WorkspaceOutboxHandler,
@@ -87,6 +89,14 @@ const approvalRepository = new PostgresApprovalRepository(db);
 const operationRepository = new PostgresGitOperationRepository(db);
 const credentialLeaseRepository = new PostgresCredentialLeaseRepository(db);
 const auditEventRepository = new PostgresAuditEventRepository(db);
+const ideAccessService = new AuditedIdeAccessService(
+  new IdeAccessService(
+    new PostgresIdeAccessRepository(db),
+    config.RAD_IDE_ACCESS_CODE_TTL_SECONDS,
+    config.RAD_IDE_SESSION_TTL_SECONDS,
+  ),
+  auditEventRepository,
+);
 const artifactService = new ArtifactService(
   artifactRepository,
   repository,
@@ -133,7 +143,7 @@ const gitOperationService = new GitOperationService(
 const server = createControlServer({
   config,
   repository,
-  supervisor,
+  ideAccess: ideAccessService,
   reconciler,
   coordinator,
   taskService,

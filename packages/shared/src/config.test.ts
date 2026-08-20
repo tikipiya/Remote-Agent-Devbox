@@ -18,6 +18,10 @@ describe("loadRuntimeConfig", () => {
     expect(config.RAD_ARTIFACT_VOLUME).toBe("rad-artifacts");
     expect(config.RAD_VALIDATOR_IMAGE_DIGEST).toBeUndefined();
     expect(config.RAD_APPROVAL_TTL_SECONDS).toBe(3_600);
+    expect(config.RAD_IDE_ACCESS_CODE_TTL_SECONDS).toBe(60);
+    expect(config.RAD_IDE_SESSION_TTL_SECONDS).toBe(3_600);
+    expect(config.RAD_IDE_PROXY_IMAGE).toBe("remote-agent-devbox-ide-proxy:local");
+    expect(config.RAD_IDE_PROXY_PUBLIC_URL).toBe("http://127.0.0.1:3001");
   });
 
   it("rejects non-canonical validator image digests", () => {
@@ -68,5 +72,17 @@ describe("loadRuntimeConfig", () => {
       loadRuntimeConfig({ ...validEnvironment, RAD_CODEX_API_KEY: "secret" })
         .RAD_CODEX_API_KEY,
     ).toBe("secret");
+  });
+
+  it("accepts only a high-entropy IDE proxy shared secret", () => {
+    expect(() =>
+      loadRuntimeConfig({ ...validEnvironment, RAD_IDE_PROXY_SHARED_SECRET: "short" }),
+    ).toThrow();
+    expect(
+      loadRuntimeConfig({
+        ...validEnvironment,
+        RAD_IDE_PROXY_SHARED_SECRET: "x".repeat(32),
+      }).RAD_IDE_PROXY_SHARED_SECRET,
+    ).toHaveLength(32);
   });
 });

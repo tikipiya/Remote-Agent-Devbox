@@ -5,7 +5,8 @@
 ## Implemented tier
 
 This release implements Tier 1 (Secure Personal / Small Team). The host,
-PostgreSQL administrator, Docker daemon, and `rad-control` process are trusted.
+PostgreSQL administrator, Docker daemon, `rad-control`, and the dedicated IDE
+Proxy are trusted.
 Module boundaries inside `rad-control` improve auditability but are not process
 isolation boundaries.
 
@@ -26,8 +27,8 @@ security-posture hash. Startup behavior is fail closed:
 An explicit migration enters maintenance, blocks new sensitive work, rejects a
 transition while any Git operation is `PUSHING`, stales pending/approved
 approvals, cancels unfinished Git operations, invalidates active credential
-leases, stops active Workspaces, increments the epoch, and writes append-only
-audit events.
+leases and IDE access, stops active Workspaces, increments the epoch, and
+writes append-only audit events.
 
 Old Review Snapshots remain readable, but their epoch and posture bindings
 prevent them from authorizing work after migration. Existing Workspaces are

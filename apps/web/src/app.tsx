@@ -20,8 +20,8 @@ import { useMemo, useState } from "react";
 
 import {
   captureArtifact,
+  createIdeAccess,
   decideApproval,
-  getIdeUrl,
   getWorkspace,
   getSecurityStatus,
   listAuditEvents,
@@ -114,10 +114,19 @@ export function App(): React.JSX.Element {
     mutationFn: () => startGitOperation(approval!.id),
     onSuccess: setGitOperation,
   });
+  const ideAccess = useMutation({
+    mutationFn: () => createIdeAccess(workspaceId!, ownerUserId),
+  });
   const openIde = async (): Promise<void> => {
-    const { url } = await getIdeUrl(workspaceId!);
-    if (!url) throw new Error("IDE is not available");
-    window.open(url, "_blank", "noopener,noreferrer");
+    const popup = window.open("about:blank", "_blank");
+    if (!popup) throw new Error("The browser blocked the IDE window");
+    popup.opener = null;
+    try {
+      const { url } = await ideAccess.mutateAsync();
+      popup.location.replace(url);
+    } catch {
+      popup.close();
+    }
   };
 
   const workspace = workspaceQuery.data;
@@ -129,6 +138,7 @@ export function App(): React.JSX.Element {
     approvalRequest.error ??
     approvalDecision.error ??
     operationStart.error ??
+    ideAccess.error ??
     securityQuery.error ??
     auditQuery.error ??
     workspaceQuery.error;
@@ -202,8 +212,12 @@ export function App(): React.JSX.Element {
                 </div>
                 <p className="break-all rounded-lg bg-black/20 p-3 font-mono text-xs text-slate-400">{workspace.id}</p>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => void openIde()} disabled={workspace.observedState !== "READY"}>
-                    <ExternalLink size={14} /> Open IDE
+                  <Button
+                    size="sm"
+                    onClick={() => void openIde()}
+                    disabled={maintenance || workspace.observedState !== "READY" || ideAccess.isPending}
+                  >
+                    <ExternalLink size={14} /> {ideAccess.isPending ? "Issuing IDE access…" : "Open IDE"}
                   </Button>
                   <Button size="sm" variant="secondary" disabled={maintenance} onClick={() => transition.mutate("RUNNING")}>
                     <Play size={14} /> Start

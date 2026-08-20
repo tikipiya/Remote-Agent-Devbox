@@ -5,7 +5,7 @@
 ## ローカル Tier 1 の起動
 
 1. Node.js 22.15 以降、Rootless Docker Engine 26 以降、Docker Compose をインストールします。
-2. `.env.example` を `.env` へコピーし、PostgreSQL のパスワードを変更して、専用の OpenAI プロジェクトキーを `RAD_CODEX_API_KEY` に設定します。
+2. `.env.example` を `.env` へコピーし、PostgreSQL のパスワードを変更して、専用の OpenAI プロジェクトキーを `RAD_CODEX_API_KEY` に設定します。`openssl rand -hex 32` で独立した IDE Proxy シークレットを生成し、`RAD_IDE_PROXY_SHARED_SECRET` に設定します。
 3. Bot Application の準備ができていない場合、Discord の変数は空のままにします。
 4. イメージをビルドします。
 
@@ -33,6 +33,20 @@ docker compose up -d
 
 ```bash
 npm run verify:validator
+```
+
+## ワンタイム IDE アクセス
+
+`POST /api/workspaces/:id/ide-access` は、`READY` 状態の Workspace にだけワンタイム URL を発行します。コードのデフォルト有効期間は60秒で、交換後の Session は Workspace の有効期限を上限として3,600秒有効です。`RAD_IDE_ACCESS_CODE_TTL_SECONDS` と `RAD_IDE_SESSION_TTL_SECONDS` で設定します。
+
+IDE Proxy は `RAD_IDE_PROXY_PORT`（デフォルト `3001`）で個別に公開されます。ローカル Tier 1 デプロイでは、`RAD_IDE_PROXY_PUBLIC_URL` を `http://127.0.0.1:3001` のままにしてください。Remote Access には運用者が管理する HTTPS Endpoint と、それに一致する Public URL が必要です。Workspace の code-server Port を直接公開しないでください。
+
+Control と `ide-proxy` には同じ `RAD_IDE_PROXY_SHARED_SECRET` を渡す必要があります。この値の Rotation はセキュリティ Posture を変更するため、後述する明示的なマイグレーションが必要です。シークレットがない場合、以前の認証なし直接 URL へフォールバックせず、IDE Access は無効になります。
+
+CI タグのイメージに対して Container 境界チェックを実行します。
+
+```bash
+RAD_IDE_PROXY_IMAGE=remote-agent-devbox-ide-proxy:local npm run verify:ide-proxy
 ```
 
 ## 承認済み Git 書き込み用の GitHub App
@@ -65,12 +79,13 @@ npm run verify:git-cas
 
 ## 既存データベースのマイグレーション
 
-PostgreSQL の Init File が自動実行されるのは、データディレクトリが空の場合だけです。既存の Database をバックアップし、新しい Control イメージを起動する前に、次のマイルストーン 3 のファイルを順番に適用してください。
+PostgreSQL の Init File が自動実行されるのは、データディレクトリが空の場合だけです。既存の Database をバックアップし、新しい Control イメージを起動する前に、次のファイルを順番に適用してください。
 
 ```text
 007_operational_posture.sql
 008_audit_events.sql
 009_outbox_commands.sql
+010_ide_access.sql
 ```
 
 Source File と Compose Mapping は次のとおりです。
@@ -79,6 +94,7 @@ Source File と Compose Mapping は次のとおりです。
 packages/workspace-state/migrations/0002_operational_posture.sql
 packages/audit-events/migrations/0001_audit_events.sql
 packages/outbox/migrations/0001_outbox_commands.sql
+packages/ide-access/migrations/0001_ide_access.sql
 ```
 
 `rad-control` に設定した Database Owner を使用して実行してください。`instance_metadata` を直接編集しないでください。
@@ -105,7 +121,7 @@ docker compose run --rm control \
 
 このコマンドは無効化処理の前にメンテナンスモードへ移行します。Git Operation が `PUSHING` の場合、または他の確認結果が曖昧な場合は失敗し、意図的にメンテナンスモードを維持します。Remote の結果と監査ログを確認し、Blocker を解消した後、同じ理由を使用して再試行してください。異なる理由による同時メンテナンスは拒否されます。
 
-成功後は `control` を起動し、`/health` が新しい Epoch とともに `ok` を返すことを確認します。古い Approval は Stale になっていなければならず、運用者が Workspace を再起動する前に、Active な Workspace が `STOPPED` へ収束していなければなりません。
+成功後は `control` を起動し、`/health` が新しい Epoch とともに `ok` を返すことを確認します。古い Approval は Stale になっていなければならず、運用者が Workspace を再起動する前に、Active な Workspace が `STOPPED` へ収束していなければなりません。未使用の IDE Code と Active な IDE Session が解決できなくなっていることも確認してください。
 
 ## バックアップと Restore
 

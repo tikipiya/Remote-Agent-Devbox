@@ -10,6 +10,8 @@ Tier 1 では、`rad-control` 内部で論理的な権限分離を使用しま�
 
 Workspace コンテナと検証コンテナは、強制される分離境界です。Workspace に Docker Socket、GitHub の書き込み認証情報、Control Plane の認証情報、または Control Network への経路を与えてはなりません。
 
+Workspace の code-server Port は直接公開されません。ワンタイム IDE コードはダイジェストとしてのみ保存され、現在の Epoch と Workspace State Version に結び付けられ、専用の信頼済み IDE Proxy を通じて短命な Session に交換されます。[マイルストーン 4 の IDE アクセス](./docs/ja/architecture/MILESTONE_4_IDE_ACCESS.md)を参照してください。
+
 承認済み Git 書き込みパスでは、有効期限付きの承認をイミュータブルなレビューと現在のセキュリティ Epoch に結び付けた後、Workspace 専用の Agent Branch へ1回だけ compare-and-swap Push する前に、厳密な検証を繰り返します。GitHub App Installation Token は Repository にスコープされ、メモリ内だけに保持されます。強制される特性とデプロイ時の検証要件については、[Security Gate C](./docs/ja/security/SECURITY_GATE_C.md)を参照してください。
 
 セキュリティ設定は、バージョン管理される運用状態です。既存 Database の Tier または Posture Hash が、環境変数の値から暗黙に同期されることはありません。明示的なマイグレーションはメンテナンスモードへ移行し、古い認可状態を無効化して、単調増加するセキュリティ Epoch を増加させます。監査行は、Application Database Role に対して追記専用です。これらのコントロールは、信頼済み Host または PostgreSQL Superuser が Database を直接変更することからは保護しません。[Security Gate D](./docs/ja/security/SECURITY_GATE_D.md)および[デプロイ Tier](./docs/ja/DEPLOYMENT_TIERS.md)を参照してください。
