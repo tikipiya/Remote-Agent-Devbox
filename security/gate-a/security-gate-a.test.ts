@@ -11,6 +11,10 @@ const controlDockerfilePath = new URL(
   "../../images/control/Dockerfile",
   import.meta.url,
 );
+const supervisorPath = new URL(
+  "../../apps/control/src/workspace/docker-supervisor.ts",
+  import.meta.url,
+);
 
 describe("Security Gate A", () => {
   it("does not mount the Docker socket into a workspace service", async () => {
@@ -47,5 +51,13 @@ describe("Security Gate A", () => {
     expect(dockerfile).toContain("USER 10001:10001");
     expect(dockerfile).not.toMatch(/docker\.sock/i);
     expect(controlDockerfile).toContain("USER node");
+  });
+
+  it("places model identity only in the separate agent runner", async () => {
+    const supervisor = await readFile(supervisorPath, "utf8");
+
+    expect(supervisor).toContain('"--network",\n      `container:');
+    expect(supervisor).toContain('"--env",\n      "OPENAI_API_KEY"');
+    expect(supervisor).not.toContain('`OPENAI_API_KEY=${');
   });
 });

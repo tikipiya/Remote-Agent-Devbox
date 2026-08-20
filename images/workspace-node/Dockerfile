@@ -42,5 +42,7 @@ USER 10001:10001
 WORKDIR /workspace
 EXPOSE 3000
 HEALTHCHECK --interval=2s --timeout=2s --start-period=120s --retries=5 \
-  CMD test -d /workspace/repository/.git && pgrep -f code-server >/dev/null
+  CMD test -d /workspace/repository/.git \
+    && pgrep -f code-server >/dev/null \
+    && pgrep -f 'codex exec-server' >/dev/null
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/rad-workspace-entrypoint"]

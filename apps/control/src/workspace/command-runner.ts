@@ -12,7 +12,7 @@ export interface CommandRunner {
   run(
     executable: string,
     args: readonly string[],
-    options?: { timeoutMs?: number },
+    options?: { timeoutMs?: number; env?: NodeJS.ProcessEnv },
   ): Promise<CommandResult>;
 }
 
@@ -20,13 +20,14 @@ export class ExecFileCommandRunner implements CommandRunner {
   public async run(
     executable: string,
     args: readonly string[],
-    options: { timeoutMs?: number } = {},
+    options: { timeoutMs?: number; env?: NodeJS.ProcessEnv } = {},
   ): Promise<CommandResult> {
     return execFileAsync(executable, [...args], {
       encoding: "utf8",
       maxBuffer: 1024 * 1024,
       timeout: options.timeoutMs ?? 30_000,
       windowsHide: true,
+      env: options.env,
     });
   }
 }

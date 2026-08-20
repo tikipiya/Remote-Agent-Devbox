@@ -120,25 +120,28 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
     if ((await this.inspect(workspace)) !== "RUNNING") {
       throw new RadError("WORKSPACE_NOT_READY", `Workspace ${workspace.id} is not running`);
     }
+    if (!this.config.RAD_CODEX_API_KEY) {
+      throw new RadError(
+        "CODEX_IDENTITY_NOT_CONFIGURED",
+        "RAD_CODEX_API_KEY is required to run an agent task",
+      );
+    }
     const payload = Buffer.from(
-      JSON.stringify({ task, cwd: "/workspace/repository" }),
+      JSON.stringify({
+        task,
+        cwd: "/workspace/repository",
+        environmentId: workspace.id,
+        execServerUrl: "ws://127.0.0.1:4500",
+      }),
       "utf8",
     ).toString("base64url");
     const result = await this.commandRunner.run(
       "docker",
-      [
-        "container",
-        "exec",
-        "--user",
-        "10001:10001",
-        "--workdir",
-        "/workspace/repository",
-        containerName(workspace.id),
-        "node",
-        "/opt/rad/agent-worker/dist/main.js",
-        payload,
-      ],
-      { timeoutMs: 60 * 60 * 1000 },
+      this.createAgentRunnerArguments(workspace, payload),
+      {
+        timeoutMs: 60 * 60 * 1000,
+        env: agentRunnerEnvironment(this.config.RAD_CODEX_API_KEY),
+      },
     );
     const events = result.stdout
       .split(/\r?\n/)
@@ -158,6 +161,43 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
       turnId: completed.turnId,
       message: completed.message,
     };
+  }
+
+  public createAgentRunnerArguments(
+    workspace: Workspace,
+    payload: string,
+  ): string[] {
+    return [
+      "container",
+      "run",
+      "--rm",
+      "--label",
+      `dev.rad.agent-workspace-id=${workspace.id}`,
+      "--network",
+      `container:${containerName(workspace.id)}`,
+      "--memory",
+      `${this.config.RAD_WORKSPACE_MEMORY_MB}m`,
+      "--cpus",
+      String(this.config.RAD_WORKSPACE_CPUS),
+      "--pids-limit",
+      String(this.config.RAD_WORKSPACE_PIDS),
+      "--cap-drop",
+      "ALL",
+      "--security-opt",
+      "no-new-privileges=true",
+      "--read-only",
+      "--tmpfs",
+      "/tmp:rw,noexec,nosuid,nodev,size=256m",
+      "--tmpfs",
+      "/home/codex/.codex:rw,nosuid,nodev,size=64m,uid=10001,gid=10001",
+      "--env",
+      "OPENAI_API_KEY",
+      "--entrypoint",
+      "node",
+      this.config.RAD_WORKSPACE_IMAGE,
+      "/opt/rad/agent-worker/dist/main.js",
+      payload,
+    ];
   }
 
   public createArguments(
@@ -254,6 +294,15 @@ export class DockerSandboxSupervisor implements SandboxSupervisor {
       }
     }
   }
+}
+
+function agentRunnerEnvironment(apiKey: string): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = { OPENAI_API_KEY: apiKey };
+  for (const name of ["PATH", "HOME", "LANG", "LC_ALL", "DOCKER_HOST"] as const) {
+    const value = process.env[name];
+    if (value !== undefined) environment[name] = value;
+  }
+  return environment;
 }
 
 function containerName(workspaceId: string): string {

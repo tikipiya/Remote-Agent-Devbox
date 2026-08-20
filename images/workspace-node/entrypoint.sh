@@ -14,9 +14,13 @@ if [ ! -d /workspace/repository/.git ]; then
     -c "$RAD_AGENT_BRANCH"
 fi
 
+codex exec-server \
+  --listen ws://127.0.0.1:4500 \
+  --strict-config \
+  --disable multi_agent &
+
 exec code-server \
   --bind-addr 0.0.0.0:3000 \
   --auth none \
   --disable-telemetry \
   /workspace/repository
-

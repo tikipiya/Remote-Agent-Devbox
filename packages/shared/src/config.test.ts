@@ -37,5 +37,12 @@ describe("loadRuntimeConfig", () => {
       loadRuntimeConfig({ ...validEnvironment, RAD_DISCORD_TOKEN: "secret" }),
     ).toThrow(/configured together/);
   });
-});
 
+  it("allows startup without Codex identity but retains one when configured", () => {
+    expect(loadRuntimeConfig(validEnvironment).RAD_CODEX_API_KEY).toBeUndefined();
+    expect(
+      loadRuntimeConfig({ ...validEnvironment, RAD_CODEX_API_KEY: "secret" })
+        .RAD_CODEX_API_KEY,
+    ).toBe("secret");
+  });
+});

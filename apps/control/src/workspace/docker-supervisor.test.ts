@@ -23,6 +23,22 @@ class RecordingRunner implements CommandRunner {
   }
 }
 
+class HealthyWorkspaceRunner extends RecordingRunner {
+  public override async run(
+    executable: string,
+    args: readonly string[],
+  ): Promise<CommandResult> {
+    this.calls.push({ executable, args });
+    if (args[0] === "container" && args[1] === "inspect") {
+      return {
+        stdout: JSON.stringify({ Running: true, Health: { Status: "healthy" } }),
+        stderr: "",
+      };
+    }
+    return { stdout: "", stderr: "" };
+  }
+}
+
 const workspace: Workspace = {
   id: randomUUID(),
   ownerUserId: randomUUID(),
@@ -85,5 +101,46 @@ describe("DockerSandboxSupervisor", () => {
       supervisor.inspect({ ...workspace, id: "$(unsafe)" }),
     ).rejects.toThrow(/UUID/);
     expect(runner.calls).toEqual([]);
+  });
+
+  it("runs Codex in a separate hardened container without putting the key in arguments", () => {
+    const supervisor = new DockerSandboxSupervisor(
+      loadRuntimeConfig({
+        RAD_DATABASE_URL: "postgresql://rad:rad@db/rad",
+        RAD_WORKSPACE_IMAGE: "rad/workspace:local",
+        RAD_CODEX_API_KEY: "super-secret",
+      }),
+      new RecordingRunner(),
+      async () => repository,
+    );
+
+    const args = supervisor.createAgentRunnerArguments(workspace, "payload");
+    const serialized = args.join(" ");
+
+    expect(serialized).toContain(`--network container:rad-ws-${workspace.id}`);
+    expect(args).toContain("--rm");
+    expect(args).toContain("--read-only");
+    expect(args).toContain("OPENAI_API_KEY");
+    expect(serialized).not.toContain("super-secret");
+    expect(serialized).not.toContain(`source=rad-data-${workspace.id}`);
+    expect(serialized).not.toMatch(/docker\.sock/i);
+  });
+
+  it("fails closed before starting an agent runner when identity is absent", async () => {
+    const runner = new HealthyWorkspaceRunner();
+    const supervisor = new DockerSandboxSupervisor(
+      loadRuntimeConfig({
+        RAD_DATABASE_URL: "postgresql://rad:rad@db/rad",
+        RAD_WORKSPACE_IMAGE: "rad/workspace:local",
+      }),
+      runner,
+      async () => repository,
+    );
+
+    await expect(supervisor.runTask(workspace, "test task")).rejects.toThrow(
+      /RAD_CODEX_API_KEY/,
+    );
+    expect(runner.calls).toHaveLength(1);
+    expect(runner.calls[0]?.args.slice(0, 2)).toEqual(["container", "inspect"]);
   });
 });
