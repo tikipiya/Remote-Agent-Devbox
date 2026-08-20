@@ -13,10 +13,12 @@ import {
   type RuntimeConfig,
 } from "@rad/shared";
 import type {
+  InstanceMetadataRepository,
   WorkspaceCoordinator,
   WorkspaceReconciler,
   WorkspaceRepository,
 } from "@rad/workspace-state";
+import type { AuditEventRepository } from "@rad/audit-events";
 
 import type { DockerSandboxSupervisor } from "./workspace/docker-supervisor.js";
 import type { TaskService } from "./tasks/task-service.js";
@@ -38,6 +40,8 @@ export interface ControlServices {
   approvalService: Pick<ApprovalService, "request" | "get" | "approve" | "deny">;
   gitOperationService: Pick<GitOperationService, "start" | "get">;
   operationalGuard: OperationalGuard;
+  securityMetadata: Pick<InstanceMetadataRepository, "getSecurityMetadata">;
+  auditEvents: Pick<AuditEventRepository, "listRecent">;
 }
 
 const repositoryBodySchema = z.object({
@@ -62,6 +66,7 @@ const approvalRequestBodySchema = z.object({ requestedBy: z.uuid() }).strict();
 const approvalDecisionBodySchema = z
   .object({ decision: z.enum(["APPROVE", "DENY"]), decidedBy: z.uuid() })
   .strict();
+const auditQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) });
 
 export function createControlServer(services: ControlServices): FastifyInstance {
   const server = Fastify({
@@ -87,7 +92,27 @@ export function createControlServer(services: ControlServices): FastifyInstance 
     void reply.status(500).send({ error: "INTERNAL_ERROR" });
   });
 
-  server.get("/health", async () => ({ status: "ok", tier: 1 }));
+  server.get("/health", async () => {
+    const metadata = await services.securityMetadata.getSecurityMetadata();
+    return {
+      status: metadata?.maintenanceMode ? "maintenance" : "ok",
+      tier: metadata?.deploymentTier ?? null,
+      securityEpoch: metadata?.securityEpoch ?? null,
+    };
+  });
+
+  server.get("/api/security/status", async () => {
+    const metadata = await services.securityMetadata.getSecurityMetadata();
+    if (!metadata) {
+      throw new RadError("SECURITY_CONTEXT_MISSING", "Instance security metadata is missing");
+    }
+    return metadata;
+  });
+
+  server.get("/api/audit-events", async (request) => {
+    const { limit } = auditQuerySchema.parse(request.query);
+    return services.auditEvents.listRecent(limit);
+  });
 
   const webRoot = resolve("apps/web/dist");
   if (existsSync(`${webRoot}/index.html`)) {

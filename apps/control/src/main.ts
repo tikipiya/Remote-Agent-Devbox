@@ -1,5 +1,6 @@
 import { loadRuntimeConfig } from "@rad/shared";
 import { PostgresAgentTaskRepository } from "@rad/agents";
+import { PostgresAuditEventRepository } from "@rad/audit-events";
 import { OutboxDispatcher, PostgresOutboxRepository } from "@rad/outbox";
 import { PostgresApprovalRepository } from "@rad/approvals";
 import {
@@ -85,6 +86,7 @@ const reviewRepository = new PostgresReviewSnapshotRepository(db);
 const approvalRepository = new PostgresApprovalRepository(db);
 const operationRepository = new PostgresGitOperationRepository(db);
 const credentialLeaseRepository = new PostgresCredentialLeaseRepository(db);
+const auditEventRepository = new PostgresAuditEventRepository(db);
 const artifactService = new ArtifactService(
   artifactRepository,
   repository,
@@ -140,6 +142,8 @@ const server = createControlServer({
   approvalService,
   gitOperationService,
   operationalGuard,
+  securityMetadata: repository,
+  auditEvents: auditEventRepository,
 });
 
 const reconcileTimer = setInterval(() => {

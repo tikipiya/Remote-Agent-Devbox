@@ -41,8 +41,39 @@ export interface ReviewSnapshot {
     baseCommit: string;
     targetCommit: string;
     targetTree: string;
-    files: Array<{ pathBase64: string; status: "A" | "D" | "M" | "T" }>;
+    files: Array<{
+      pathBase64: string;
+      status: "A" | "D" | "M" | "T";
+      oldMode: string;
+      newMode: string;
+      oldBlob: string;
+      newBlob: string;
+    }>;
   };
+}
+
+export interface SecurityStatus {
+  deploymentTier: number;
+  securityEpoch: number;
+  securityPostureHash: string;
+  maintenanceMode: boolean;
+  maintenanceReason: string | null;
+  maintenanceStartedAt: string | null;
+  updatedAt: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  sequence: number;
+  eventType: string;
+  severity: "INFO" | "WARNING" | "HIGH" | "CRITICAL";
+  actorId: string | null;
+  subjectType: string;
+  subjectId: string | null;
+  securityEpoch: number;
+  deploymentTier: number;
+  details: Record<string, string | number | boolean | null>;
+  occurredAt: string;
 }
 
 export interface ApprovalRequest {
@@ -162,3 +193,9 @@ export const decideApproval = (
 
 export const startGitOperation = (approvalId: string): Promise<GitOperation> =>
   request(`/api/approvals/${approvalId}/git-operations`, { method: "POST" });
+
+export const getSecurityStatus = (): Promise<SecurityStatus> =>
+  request("/api/security/status");
+
+export const listAuditEvents = (limit = 20): Promise<AuditEvent[]> =>
+  request(`/api/audit-events?limit=${limit}`);

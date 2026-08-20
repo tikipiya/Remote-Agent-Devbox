@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleDot,
   CircleCheck,
+  History,
   ExternalLink,
   GitBranch,
   LoaderCircle,
@@ -10,6 +11,7 @@ import {
   Power,
   Square,
   ShieldCheck,
+  ShieldAlert,
   TerminalSquare,
   Trash2,
   XCircle,
@@ -21,6 +23,8 @@ import {
   decideApproval,
   getIdeUrl,
   getWorkspace,
+  getSecurityStatus,
+  listAuditEvents,
   provisionWorkspace,
   requestApproval,
   runTask,
@@ -31,6 +35,7 @@ import {
   type ApprovalRequest,
   type GitOperation,
   type Workspace,
+  type AuditEvent,
 } from "./api";
 import { Button } from "./components/ui/button";
 import { Card } from "./components/ui/card";
@@ -47,6 +52,16 @@ export function App(): React.JSX.Element {
   const [approval, setApproval] = useState<ApprovalRequest>();
   const [gitOperation, setGitOperation] = useState<GitOperation>();
   const ownerUserId = useMemo(() => getOwnerId(), []);
+  const securityQuery = useQuery({
+    queryKey: ["security-status"],
+    queryFn: getSecurityStatus,
+    refetchInterval: 5_000,
+  });
+  const auditQuery = useQuery({
+    queryKey: ["audit-events"],
+    queryFn: () => listAuditEvents(20),
+    refetchInterval: 10_000,
+  });
 
   const workspaceQuery = useQuery({
     queryKey: ["workspace", workspaceId],
@@ -114,7 +129,10 @@ export function App(): React.JSX.Element {
     approvalRequest.error ??
     approvalDecision.error ??
     operationStart.error ??
+    securityQuery.error ??
+    auditQuery.error ??
     workspaceQuery.error;
+  const maintenance = securityQuery.data?.maintenanceMode ?? true;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#164e63_0,transparent_34%),linear-gradient(145deg,#020617_0%,#0f172a_55%,#07131c_100%)] px-5 py-10 text-slate-100">
@@ -129,8 +147,13 @@ export function App(): React.JSX.Element {
               Provision an isolated workspace, send a focused task to Codex, and inspect the result in a local web IDE.
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-300">
-            <CircleDot size={13} /> Secure Personal / Small Team
+          <div className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs ${
+            maintenance
+              ? "border-amber-400/20 bg-amber-400/10 text-amber-300"
+              : "border-emerald-400/20 bg-emerald-400/10 text-emerald-300"
+          }`}>
+            {maintenance ? <ShieldAlert size={13} /> : <CircleDot size={13} />}
+            {maintenance ? "Security maintenance" : `Tier ${securityQuery.data?.deploymentTier ?? "…"} · Epoch ${securityQuery.data?.securityEpoch ?? "…"}`}
           </div>
         </header>
 
@@ -160,7 +183,7 @@ export function App(): React.JSX.Element {
                   onChange={(event) => setDefaultBranch(event.target.value)}
                 />
               </Field>
-              <Button className="w-full" disabled={provision.isPending}>
+              <Button className="w-full" disabled={provision.isPending || maintenance}>
                 {provision.isPending ? <LoaderCircle className="animate-spin" size={16} /> : <Play size={16} />}
                 Create and start
               </Button>
@@ -182,7 +205,7 @@ export function App(): React.JSX.Element {
                   <Button size="sm" onClick={() => void openIde()} disabled={workspace.observedState !== "READY"}>
                     <ExternalLink size={14} /> Open IDE
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => transition.mutate("RUNNING")}>
+                  <Button size="sm" variant="secondary" disabled={maintenance} onClick={() => transition.mutate("RUNNING")}>
                     <Play size={14} /> Start
                   </Button>
                   <Button size="sm" variant="secondary" onClick={() => transition.mutate("STOPPED")}>
@@ -208,7 +231,7 @@ export function App(): React.JSX.Element {
                   onChange={(event) => setPrompt(event.target.value)}
                 />
                 <Button
-                  disabled={!workspace || workspace.observedState !== "READY" || !prompt || task.isPending}
+                  disabled={maintenance || !workspace || workspace.observedState !== "READY" || !prompt || task.isPending}
                   onClick={() => task.mutate()}
                 >
                   {task.isPending ? <LoaderCircle className="animate-spin" size={16} /> : <Play size={16} />}
@@ -231,7 +254,7 @@ export function App(): React.JSX.Element {
               </div>
               <Button
                 disabled={
-                  !workspace || workspace.observedState !== "READY" || validation.isPending
+                  maintenance || !workspace || workspace.observedState !== "READY" || validation.isPending
                 }
                 onClick={() => validation.mutate()}
               >
@@ -249,6 +272,7 @@ export function App(): React.JSX.Element {
                 approval={approval}
                 operation={gitOperation}
                 isPending={
+                  maintenance ||
                   approvalRequest.isPending ||
                   approvalDecision.isPending ||
                   operationStart.isPending
@@ -258,6 +282,16 @@ export function App(): React.JSX.Element {
                 onStartOperation={() => operationStart.mutate()}
               />
             ) : null}
+          </Card>
+
+          <Card className="lg:col-span-2">
+            <SectionTitle icon={<History size={18} />} title="Operational security audit" />
+            {securityQuery.data?.maintenanceMode ? (
+              <p className="mt-4 rounded-lg border border-amber-400/20 bg-amber-400/10 p-3 text-xs text-amber-200">
+                Mutating operations are paused: {securityQuery.data.maintenanceReason ?? "security maintenance"}
+              </p>
+            ) : null}
+            <AuditTimeline events={auditQuery.data ?? []} />
           </Card>
         </div>
         {error ? <p className="mt-5 rounded-lg border border-rose-400/20 bg-rose-400/10 p-3 text-sm text-rose-200">{error.message}</p> : null}
@@ -283,13 +317,17 @@ function ReviewSummary({
   onDecision: (decision: "APPROVE" | "DENY") => void;
   onStartOperation: () => void;
 }): React.JSX.Element {
+  const modeChanges = review.structuralManifest.files.filter(
+    (file) => file.oldMode !== file.newMode,
+  ).length;
   return (
     <div className="mt-5 space-y-4 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.04] p-4">
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-5">
         <Metric label="CRF" value="CRF-1" accent />
         <Metric label="Tier" value={String(review.deploymentTier)} />
         <Metric label="Security epoch" value={String(review.securityEpoch)} />
         <Metric label="Changed files" value={String(review.structuralManifest.files.length)} />
+        <Metric label="Mode changes" value={String(modeChanges)} />
       </div>
       <Digest label="Review digest" value={review.reviewDigest} />
       <Digest label="Artifact digest" value={review.artifactDigest} />
@@ -300,11 +338,16 @@ function ReviewSummary({
         <Commit label="Tree" value={review.structuralManifest.targetTree} />
       </div>
       {review.structuralManifest.files.length > 0 ? (
-        <div className="max-h-44 overflow-auto rounded-lg bg-black/20 p-3 font-mono text-xs text-slate-300">
+        <div className="max-h-72 overflow-auto rounded-lg bg-black/20 p-3 font-mono text-xs text-slate-300">
           {review.structuralManifest.files.map((file) => (
-            <div className="flex gap-3 py-1" key={`${file.status}:${file.pathBase64}`}>
-              <span className="w-4 text-cyan-300">{file.status}</span>
-              <span className="break-all">{displayPath(file.pathBase64)}</span>
+            <div className="border-b border-white/5 py-2 last:border-0" key={`${file.status}:${file.pathBase64}`}>
+              <div className="flex gap-3">
+                <span className="w-4 text-cyan-300">{file.status}</span>
+                <span className="break-all">{displayPath(file.pathBase64)}</span>
+              </div>
+              <div className="mt-1 pl-7 text-[10px] text-slate-500">
+                mode {file.oldMode} → {file.newMode} · blob {file.oldBlob.slice(0, 10)} → {file.newBlob.slice(0, 10)}
+              </div>
             </div>
           ))}
         </div>
@@ -376,6 +419,39 @@ function ReviewSummary({
       ) : null}
     </div>
   );
+}
+
+function AuditTimeline({ events }: { events: AuditEvent[] }): React.JSX.Element {
+  if (events.length === 0) {
+    return <p className="mt-4 text-xs text-slate-500">No security audit events recorded yet.</p>;
+  }
+  return (
+    <div className="mt-4 max-h-72 space-y-2 overflow-auto">
+      {events.map((event) => (
+        <div className="rounded-lg border border-white/5 bg-black/20 p-3" key={event.id}>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className={auditSeverityClass(event.severity)}>{event.severity} · {event.eventType}</span>
+            <span className="text-slate-500">{new Date(event.occurredAt).toLocaleString()}</span>
+          </div>
+          <div className="mt-1 text-[10px] text-slate-500">
+            Tier {event.deploymentTier} · Epoch {event.securityEpoch} · Sequence {event.sequence}
+          </div>
+          {Object.keys(event.details).length > 0 ? (
+            <div className="mt-2 break-all font-mono text-[10px] text-slate-400">
+              {JSON.stringify(event.details)}
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function auditSeverityClass(severity: AuditEvent["severity"]): string {
+  if (severity === "CRITICAL") return "text-rose-300";
+  if (severity === "HIGH") return "text-amber-300";
+  if (severity === "WARNING") return "text-yellow-200";
+  return "text-cyan-300";
 }
 
 function Digest({ label, value }: { label: string; value: string }): React.JSX.Element {
