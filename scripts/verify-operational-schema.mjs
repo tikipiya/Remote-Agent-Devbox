@@ -79,11 +79,15 @@ try {
 
 async function waitForDatabase() {
   for (let attempt = 0; attempt < 60; attempt += 1) {
+    const logs = await docker(["logs", project], true);
+    const initializationComplete = `${logs.stdout}\n${logs.stderr}`.includes(
+      "PostgreSQL init process complete; ready for start up.",
+    );
     const result = await docker(
       ["exec", project, "pg_isready", "-U", "rad", "-d", "rad"],
       true,
     );
-    if (result.exitCode === 0) return;
+    if (initializationComplete && result.exitCode === 0) return;
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
   throw new Error("PostgreSQL did not become ready");
