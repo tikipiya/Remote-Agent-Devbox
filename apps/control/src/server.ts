@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 
+import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyInstance } from "fastify";
 import { z } from "zod";
 
@@ -71,6 +74,11 @@ export function createControlServer(services: ControlServices): FastifyInstance 
   });
 
   server.get("/health", async () => ({ status: "ok", tier: 1 }));
+
+  const webRoot = resolve("apps/web/dist");
+  if (existsSync(`${webRoot}/index.html`)) {
+    void server.register(fastifyStatic, { root: webRoot, wildcard: true });
+  }
 
   server.post("/api/repositories", async (request, reply) => {
     const input = repositoryBodySchema.parse(request.body);

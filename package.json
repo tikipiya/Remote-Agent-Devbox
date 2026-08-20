@@ -13,7 +13,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && npm run build --workspace=@rad/web",
     "check": "npm run typecheck && npm run test",
     "dev": "npm run dev --workspace=@rad/control",
     "test": "vitest run",
